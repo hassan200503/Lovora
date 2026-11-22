@@ -1,7 +1,9 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { requireCtx, type PublicPerson } from "@/lib/context";
+import { getCtx, type PublicPerson } from "@/lib/context";
 import { BRAND } from "@lovora/domain";
+import { LandingPage } from "@/components/marketing/landing";
 import { birthdayInfo, daysUntil, onThisDay, story, together } from "@/lib/data";
 import { galleryPage, recentMedia } from "@/lib/media/queries";
 import { todaysQuestion } from "@/lib/together/daily";
@@ -125,12 +127,47 @@ function SectionHead({ eyebrow, title, action }: { eyebrow: string; title: React
   );
 }
 
+const SITE_URL =
+  process.env.APP_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
+
+const LANDING_TITLE = "A private world for two";
+const LANDING_DESCRIPTION =
+  "Messages, calls, synced film nights, a shared gallery, memories and daily rituals — in one private place built for exactly two people. No feed, no followers, no ads.";
+
+export async function generateMetadata(): Promise<Metadata> {
+  if (await getCtx()) return {};
+
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: LANDING_TITLE,
+    description: LANDING_DESCRIPTION,
+    robots: { index: true, follow: true },
+    alternates: { canonical: "/" },
+    openGraph: {
+      title: `${LANDING_TITLE} · ${BRAND.name}`,
+      description: LANDING_DESCRIPTION,
+      type: "website",
+      url: "/",
+      siteName: BRAND.name,
+      images: [{ url: "/media/og-lovora.jpg", width: 1200, height: 630, alt: `${BRAND.name} — a private world for two` }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${LANDING_TITLE} · ${BRAND.name}`,
+      description: LANDING_DESCRIPTION,
+      images: ["/media/og-lovora.jpg"],
+    },
+  };
+}
+
 export default async function Home() {
-  const ctx = await requireCtx();
+  const ctx = await getCtx();
+  const serverNow = nowMs();
+  if (!ctx) return <LandingPage now={serverNow} />;
+
   const jar = await cookies();
   const verse = pick(VERSES, jar.get(VERSE_COOKIE)?.value);
   const vow = pick(VOWS, jar.get(VOW_COOKIE)?.value);
-  const serverNow = nowMs();
   const now = new Date(serverNow);
   const members = ctx.members;
   const partner = ctx.partner;
