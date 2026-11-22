@@ -8,6 +8,52 @@ Hosting: **Neon** (Postgres), **Vercel Hobby** (the website — free, no card, p
 2. **Add New → Project →** import your copy of this repository (allow Vercel access to it). Set **Root Directory** to `apps/web`; Vercel installs the pnpm workspace from the repo root and builds the web app.
 3. Add one environment variable, `DATABASE_URL` (the Neon pooled string). Session cookies are signed with a key derived from it, so nothing else is required.
 4. Deploy. Every push to `main` redeploys automatically, and each build applies any new database migrations first (`pnpm vercel-build`), so new features never run ahead of their tables.
+5. Set `APP_URL` to the public origin (for example `https://lovora-app.vercel.app`, no trailing slash). It is used in emailed links and the Google redirect.
+
+### Password recovery by email (about 10 minutes)
+
+Without an email provider, recovery still works with the one-time code saved at sign-up, and `/recover` shows that form only. Adding a provider turns on the 6-digit email flow; the saved code stays as an offline fallback.
+
+Pick **one** provider. Both are supported behind the same mailer; the app chooses `EMAIL_PROVIDER`, or the provider whose API key is present.
+
+**Brevo (easiest without a domain, free 300/day).** Sign up at brevo.com → **Senders, Domains & IPs → Senders** → add and verify the address you will send from → **SMTP & API → API Keys** → create a v3 API key. In Vercel add:
+
+- `EMAIL_PROVIDER=brevo`
+- `BREVO_API_KEY=<the v3 key>`
+- `EMAIL_FROM=Lovora <the-verified-sender@example.com>`
+
+Brevo works with a verified single sender; a custom domain (with SPF/DKIM) improves deliverability and lets you use `no-reply@yourdomain`.
+
+**Resend (needs a verified domain, free 100/day).** Sign up at resend.com → **Domains** → add your domain and publish the DNS records it shows (SPF/DKIM; DMARC recommended) → wait for **Verified** → **API Keys** → create a sending key. In Vercel add:
+
+- `EMAIL_PROVIDER=resend`
+- `RESEND_API_KEY=<the key>`
+- `EMAIL_FROM=Lovora <no-reply@yourdomain>`
+
+Use `onboarding@resend.dev` only for a quick test to the account owner's own address; it cannot send to arbitrary recipients.
+
+Redeploy after adding the variables. Locally, no key means the code is printed to the server console instead of emailed. The recovery page enables the email flow only when the provider, key and sender are all present.
+
+Codes are 6 digits, expire in 10 minutes, allow five guesses, can be resent after 60 seconds, and are stored only as a keyed hash with a random salt. Requesting a code for an unknown address returns the same message and sends nothing. A successful reset rotates the recovery code and signs out every other device.
+
+### Sign in and sign up with Google (about 10 minutes)
+
+The Google buttons stay hidden until both credentials are set, so it is safe to deploy before this step.
+
+1. Open console.cloud.google.com and create (or select) a project.
+2. **APIs & Services → OAuth consent screen**: choose **External**, set the app name, user-support email and developer contact, and keep the default basic scopes (`openid`, `email`, `profile`). If the app stays in **Testing**, add each Google account under **Test users**. When ready for anyone, press **Publish app**.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID → Web application.**
+   - Authorized JavaScript origins: `https://your-domain` (optional for this server-side flow).
+   - Authorized redirect URIs, exactly: `https://your-domain/api/auth/google/callback` and, for local development, `http://localhost:3000/api/auth/google/callback`.
+4. Copy the client ID and client secret into Vercel:
+   - `GOOGLE_CLIENT_ID=...`
+   - `GOOGLE_CLIENT_SECRET=...`
+   - `APP_URL=https://your-domain` (no trailing slash)
+5. Redeploy and open `/login` or `/welcome`. The Google button appears.
+
+The redirect URI must match character for character (scheme, host, path, no trailing slash). If `APP_URL` is wrong, Google returns `redirect_uri_mismatch`. `GOOGLE_REDIRECT_URI` can override the computed URI when a proxy or preview domain needs it.
+
+The flow uses PKCE and a signed, httpOnly state cookie. Google's ID token is verified server-side against Google's published keys, and the email must be verified. An existing account with that verified email is linked automatically; a new user first completes a short onboarding form (name, world, theme, interests), so no half-configured account is created. Accounts created this way have no password until one is set in **Settings → Account**.
 
 ### Calls on mobile data (recommended, free, about 5 minutes)
 

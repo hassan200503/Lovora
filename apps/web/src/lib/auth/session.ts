@@ -2,24 +2,14 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { authSecret } from "./secret";
 
 export const SESSION_COOKIE = "lovora_session";
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 days; sign-out-everywhere revokes older tokens.
 const ISSUER = "lovora";
 
-/**
- * Signing key for session cookies. SESSION_SECRET wins when set; otherwise the
- * key is derived from DATABASE_URL (which already holds the database password,
- * so it is at least as secret), so a deployment needs only one setting.
- * Resetting the database password therefore also signs everyone out.
- */
 function secret(): Uint8Array {
-  const s = process.env.SESSION_SECRET;
-  if (s && s.length >= 32) return new TextEncoder().encode(s);
-  const db = process.env.DATABASE_URL;
-  if (db) return new Uint8Array(createHmac("sha256", db).update("lovora/session-v1").digest());
-  if (process.env.NODE_ENV === "production") throw new Error("Set DATABASE_URL (or SESSION_SECRET) in production");
-  return new TextEncoder().encode("dev-only-secret-not-for-production-use-000");
+  return authSecret();
 }
 
 export type Session = { personId: string; slug: string; version: number };

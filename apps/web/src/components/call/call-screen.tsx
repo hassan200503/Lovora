@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
-import { IconFlip, IconMic, IconMicOff, IconMinimize, IconPhone, IconPhoneOff, IconSignal, IconSpeaker, IconVideo, IconVideoOff } from "@/components/icons";
+import { IconFlip, IconMic, IconMicOff, IconMinimize, IconPhone, IconPhoneOff, IconPlay, IconSignal, IconSpeaker, IconVideo, IconVideoOff } from "@/components/icons";
 import { useMembers, usePartner } from "@/components/me-context";
 import { duration } from "@/components/chat/format";
 import { useCall } from "./call-provider";
@@ -86,6 +87,8 @@ function Pip({ stream, mirrored }: { stream: MediaStream | null; mirrored: boole
 /** Full-screen call, a floating pill when minimised, and the incoming-call screen. */
 export function CallScreen() {
   const api = useCall();
+  const pathname = usePathname();
+  const router = useRouter();
   const members = useMembers();
   const fallbackPartner = usePartner();
   const snap = api?.snap;
@@ -127,8 +130,10 @@ export function CallScreen() {
               : elapsed;
 
   if (minimized && snap.phase !== "incoming" && snap.phase !== "ended") {
+    // In the room: above the mobile sheet's composer on phones, and beside the chat dock on desktop.
+    const spot = pathname === "/together" ? "bottom-24 right-3 sm:bottom-6 sm:right-[calc(var(--lovora-chat-w,0px)+1.25rem)]" : "bottom-24 right-3 sm:bottom-6 sm:right-6";
     return (
-      <div className="fixed bottom-24 right-3 z-[90] flex items-center gap-2 rounded-full bg-night-soft/95 py-1.5 pl-1.5 pr-2 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur-xl sm:bottom-6 sm:right-6">
+      <div className={`fixed ${spot} z-[90] flex items-center gap-2 rounded-full bg-night-soft/95 py-1.5 pl-1.5 pr-2 text-white shadow-2xl ring-1 ring-white/10 backdrop-blur-xl`}>
         <button type="button" onClick={() => setMinimized(false)} className="flex items-center gap-2.5 pr-1" aria-label="Return to call">
           {showRemote ? (
             <span className="size-10 overflow-hidden rounded-full">
@@ -214,6 +219,18 @@ export function CallScreen() {
         </p>
         {snap.phase === "connecting" && snap.route && <p className="mt-3 max-w-xs text-center text-[0.68rem] leading-snug text-white/50">{snap.route}</p>}
         {!snap.remoteMicOn && snap.phase === "connected" && <p className="mt-2 rounded-full bg-black/40 px-3 py-1 text-xs text-white/80">{first} is muted</p>}
+        {snap.phase === "connected" && pathname !== "/together" && (
+          <button
+            type="button"
+            onClick={() => {
+              setMinimized(true);
+              router.push("/together");
+            }}
+            className="btn-glass mt-4"
+          >
+            <IconPlay size={16} /> Watch something together
+          </button>
+        )}
         {snap.notice && (
           <button type="button" onClick={() => engine.clearNotice()} className="mt-4 max-w-sm rounded-2xl bg-black/50 px-4 py-2.5 text-sm text-white/90 backdrop-blur">
             {snap.notice}

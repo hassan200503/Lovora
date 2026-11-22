@@ -295,6 +295,45 @@ export async function generateJson<T>(opts: { coupleId: string; system: string; 
   return value;
 }
 
+/** A structured answer about an image. The image is sent to Gemini only; we never store it. */
+export async function generateVision<T>(opts: {
+  coupleId: string;
+  system: string;
+  prompt: string;
+  image: { mimeType: "image/png" | "image/jpeg" | "image/webp"; data: string };
+  schema: object;
+}): Promise<{ value: T; usage: AiUsage | null; model: string }> {
+  const key = await geminiKey(opts.coupleId);
+  if (!key) throw new GeminiError("Add a Gemini API key in Settings → AI research to use image search.", "no-key");
+  const { value } = await race<{ value: T; usage: AiUsage | null; model: string }>(
+    modelOrder().map((model) => ({ model, grounded: false })),
+    (a, signal) =>
+      fetch(`${BASE}/models/${a.model}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: opts.system }] },
+          contents: [{ role: "user", parts: [{ inlineData: { mimeType: opts.image.mimeType, data: opts.image.data } }, { text: opts.prompt }] }],
+          safetySettings: SAFETY_SETTINGS,
+          generationConfig: { temperature: 0.3, maxOutputTokens: 1400, responseMimeType: "application/json", responseSchema: opts.schema, ...thinking(a.model) },
+        }),
+        signal,
+      }),
+    async (a, res) => {
+      try {
+        const body = (await res.json()) as Chunk;
+        if (safetyBlocked(body)) throw new GeminiError("Gemini declined to look at that image.", "blocked");
+        return { value: JSON.parse(textOf(body)) as T, usage: mergeUsage(null, body, a.model), model: a.model };
+      } catch (e) {
+        if (e instanceof GeminiError) throw e;
+        throw new GeminiError("Gemini's answer couldn't be read. Try again.", "failed");
+      }
+    },
+    { hedgeMs: 9000, budgetMs: 50_000 },
+  );
+  return value;
+}
+
 /** Checks a key before it's saved. */
 export async function testKey(key: string): Promise<{ ok: boolean; message: string }> {
   try {

@@ -261,6 +261,44 @@ const registry: Record<string, TableSpec> = {
       return { id: row.id };
     },
   },
+  short_reactions: {
+    key: ["person_id", "video_key", "kind"],
+    touch: { column: "created_at", value: "2026-01-01T00:00:00Z" },
+    insert: async (w, side) => {
+      const videoKey = `yt:${uid()}`;
+      await db.insert(schema.shortReactions).values({ coupleId: w[side].id, personId: w[side].me, videoKey, kind: "like" });
+      return { person_id: w[side].me, video_key: videoKey, kind: "like" };
+    },
+  },
+  short_comments: {
+    key: ["id"],
+    touch: { column: "body", value: "Rewritten" },
+    insert: async (w, side) => {
+      const [row] = await db
+        .insert(schema.shortComments)
+        .values({ coupleId: w[side].id, personId: w[side].me, videoKey: `tt:${uid()}`, body: "This one" })
+        .returning();
+      return { id: row.id };
+    },
+  },
+  short_links: {
+    key: ["id"],
+    touch: { column: "url", value: "https://www.tiktok.com/@lovora/video/1" },
+    insert: async (w, side) => {
+      const videoKey = `tt:${uid()}`;
+      const [row] = await db
+        .insert(schema.shortLinks)
+        .values({
+          coupleId: w[side].id,
+          addedBy: w[side].me,
+          videoKey,
+          url: "https://www.tiktok.com/@lovora/video/1",
+          meta: { title: "A short", author: "Lovora", thumb: null, url: "https://www.tiktok.com/@lovora/video/1" },
+        })
+        .returning();
+      return { id: row.id };
+    },
+  },
 };
 
 // ── Generic SQL helpers ──────────────────────────────────────────────────────

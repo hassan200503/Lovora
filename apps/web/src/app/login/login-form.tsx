@@ -3,9 +3,10 @@
 import { useActionState, useState } from "react";
 import { login } from "@/lib/actions/auth";
 import { BRAND } from "@lovora/domain";
+import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
 import { IconAlert, IconArrowRight, IconEye, IconEyeOff, IconSpinner } from "@/components/icons";
 
-export function LoginForm({ next }: { next: string }) {
+export function LoginForm({ next, googleEnabled, notice }: { next: string; googleEnabled: boolean; notice?: string }) {
   const [show, setShow] = useState(false);
   const [state, action, pending] = useActionState(login, null);
   return (
@@ -13,7 +14,19 @@ export function LoginForm({ next }: { next: string }) {
       <p className="eyebrow-lux text-white/55">Step inside</p>
       <h2 className="font-lux mt-3 text-3xl">Welcome back.</h2>
       <p className="mt-1.5 text-sm text-white/50">Your space with the person you chose.</p>
-      <form action={action} className="mt-6 space-y-4">
+      {notice && (
+        <p role="alert" className="mt-5 flex items-start gap-2 rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-2.5 text-sm text-amber-100">
+          <IconAlert size={17} className="mt-0.5 shrink-0" />
+          {notice}
+        </p>
+      )}
+      {googleEnabled && (
+        <div className="mt-6">
+          <GoogleButton href={`/api/auth/google/start?intent=signin&next=${encodeURIComponent(next)}`} />
+          <AuthDivider />
+        </div>
+      )}
+      <form action={action} className={googleEnabled ? "space-y-4" : "mt-6 space-y-4"}>
         <input type="hidden" name="next" value={next} />
         <div className="space-y-1.5">
           <label htmlFor="email" className="type-label text-white/70">

@@ -44,6 +44,18 @@ declare global {
 
 let ytLoading: Promise<YTNamespace> | null = null;
 
+/** The iframe API can hand back an object that is still attaching, or one whose
+ * methods were torn down with the iframe. A failed call must never take the room
+ * down; the sync loop simply retries on the next tick. */
+function invoke<T>(p: YTPlayer | null, fn: (player: YTPlayer) => T): T | undefined {
+  if (!p) return undefined;
+  try {
+    return fn(p);
+  } catch {
+    return undefined;
+  }
+}
+
 /** Starts loading YouTube's player as soon as the room opens, so the first video starts without a wait. */
 export function warmYouTube() {
   preconnect("https://www.youtube-nocookie.com");
@@ -69,8 +81,8 @@ function loadYouTube(): Promise<YTNamespace> {
   return ytLoading;
 }
 
-export const YouTubePlayer = forwardRef<PlayerHandle, { videoId: string; onEnded: () => void; onReady: () => void; audioOnly?: boolean; startAt?: () => number; playing?: boolean }>(function YouTubePlayer(
-  { videoId, onEnded, onReady, audioOnly, startAt, playing },
+export const YouTubePlayer = forwardRef<PlayerHandle, { videoId: string; onEnded: () => void; onReady: () => void; onError?: (code: number) => void; audioOnly?: boolean; startAt?: () => number; playing?: boolean }>(function YouTubePlayer(
+  { videoId, onEnded, onReady, onError, audioOnly, startAt, playing },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null);
@@ -78,41 +90,50 @@ export const YouTubePlayer = forwardRef<PlayerHandle, { videoId: string; onEnded
   const ready = useRef(false);
   const ended = useRef(onEnded);
   const readyCb = useRef(onReady);
+  const errorCb = useRef(onError);
   const current = useRef(videoId);
   const shouldPlay = useRef(playing);
   const startFrom = useRef(startAt);
   useEffect(() => {
     ended.current = onEnded;
     readyCb.current = onReady;
+    errorCb.current = onError;
     shouldPlay.current = playing;
     startFrom.current = startAt;
   });
 
   useEffect(() => {
     let cancelled = false;
-    loadYouTube().then((YT) => {
-      if (cancelled || !host.current) return;
-      const el = document.createElement("div");
-      host.current.appendChild(el);
-      player.current = new YT.Player(el, {
-        // The latest video, in case it changed while YouTube's script was still loading.
-        videoId: current.current,
-        host: "https://www.youtube-nocookie.com",
-        playerVars: { controls: 0, rel: 0, modestbranding: 1, playsinline: 1, disablekb: 1, iv_load_policy: 3, fs: 0, start: Math.floor(startFrom.current?.() ?? 0) },
-        events: {
-          onReady: () => {
-            ready.current = true;
-            readyCb.current();
-          },
-          onStateChange: (e: { data: number }) => {
-            if (e.data === YT.PlayerState.ENDED) ended.current();
-          },
-        },
-      });
-    });
+    loadYouTube()
+      .then((YT) => {
+        if (cancelled || !host.current) return;
+        const el = document.createElement("div");
+        host.current.appendChild(el);
+        try {
+          player.current = new YT.Player(el, {
+            // The latest video, in case it changed while YouTube's script was still loading.
+            videoId: current.current,
+            host: "https://www.youtube-nocookie.com",
+            playerVars: { controls: 0, rel: 0, modestbranding: 1, playsinline: 1, disablekb: 1, iv_load_policy: 3, fs: 0, start: Math.floor(startFrom.current?.() ?? 0) },
+            events: {
+              onReady: () => {
+                ready.current = true;
+                readyCb.current();
+              },
+              onStateChange: (e: { data: number }) => {
+                if (e.data === YT.PlayerState.ENDED) ended.current();
+              },
+              onError: (e: { data: number }) => errorCb.current?.(e.data),
+            },
+          });
+        } catch {
+          errorCb.current?.(150);
+        }
+      })
+      .catch(() => errorCb.current?.(150));
     return () => {
       cancelled = true;
-      player.current?.destroy();
+      invoke(player.current, (p) => p.destroy());
       player.current = null;
       ready.current = false;
     };
@@ -125,8 +146,8 @@ export const YouTubePlayer = forwardRef<PlayerHandle, { videoId: string; onEnded
     if (!ready.current) return;
     // Already playing for both of you: start loading at the right second straight away.
     const startSeconds = Math.max(0, startFrom.current?.() ?? 0);
-    if (shouldPlay.current) player.current?.loadVideoById({ videoId, startSeconds });
-    else player.current?.cueVideoById({ videoId, startSeconds });
+    if (shouldPlay.current) invoke(player.current, (p) => p.loadVideoById({ videoId, startSeconds }));
+    else invoke(player.current, (p) => p.cueVideoById({ videoId, startSeconds }));
     // The same player now holds the new video: tell the room it can steer this one.
     readyCb.current();
   }, [videoId]);
@@ -134,26 +155,26 @@ export const YouTubePlayer = forwardRef<PlayerHandle, { videoId: string; onEnded
   useImperativeHandle(ref, () => ({
     play: async () => {
       if (!ready.current || !player.current) return false;
-      player.current.playVideo();
+      invoke(player.current, (p) => p.playVideo());
       // Autoplay may be blocked; report whether playback actually started. A slow network can
       // take a while to reach "buffering", so only a player still idle after ~3 s counts as blocked.
       for (let i = 0; i < 12; i++) {
         await new Promise((r) => setTimeout(r, 250));
-        const s = player.current?.getPlayerState();
+        const s = invoke(player.current, (p) => p.getPlayerState());
         if (s === 1 || s === 3) return true;
       }
       return false;
     },
-    pause: () => player.current?.pauseVideo(),
-    seek: (t) => player.current?.seekTo(t, true),
-    time: () => (ready.current ? (player.current?.getCurrentTime() ?? 0) : 0),
-    duration: () => (ready.current ? (player.current?.getDuration() ?? 0) : 0),
+    pause: () => invoke(player.current, (p) => p.pauseVideo()),
+    seek: (t) => invoke(player.current, (p) => p.seekTo(t, true)),
+    time: () => (ready.current ? (invoke(player.current, (p) => p.getCurrentTime()) ?? 0) : 0),
+    duration: () => (ready.current ? (invoke(player.current, (p) => p.getDuration()) ?? 0) : 0),
     playing: () => {
-      const s = player.current?.getPlayerState();
+      const s = invoke(player.current, (p) => p.getPlayerState());
       return s === 1 || s === 3;
     },
-    buffering: () => player.current?.getPlayerState() === 3,
-    setVolume: (v) => player.current?.setVolume(Math.round(v * 100)),
+    buffering: () => invoke(player.current, (p) => p.getPlayerState()) === 3,
+    setVolume: (v) => invoke(player.current, (p) => p.setVolume(Math.round(v * 100))),
   }));
 
   return <div ref={host} className={`[&>iframe]:size-full ${audioOnly ? "pointer-events-none absolute size-px opacity-0" : "pointer-events-none absolute inset-0"}`} />;

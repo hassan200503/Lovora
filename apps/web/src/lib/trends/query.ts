@@ -1,5 +1,5 @@
 import "server-only";
-import { and, arrayOverlaps, desc, eq, gte, inArray, max, notInArray, sql, type SQL } from "drizzle-orm";
+import { and, arrayOverlaps, desc, eq, gte, ilike, inArray, max, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { interests, preferences, savedDiscoveries, trendSources, trends } from "@/lib/db/schema";
 import { SOURCES } from "./sources";
@@ -302,6 +302,16 @@ export async function getTrend(viewers: Viewers, id: string): Promise<TrendCard 
   return row ? (await attachReactions([row], viewers))[0] : null;
 }
 
+/** Topics whose sources have never been attempted — new sections bootstrap without waiting for the next cron. */
+export async function unattemptedTopics(): Promise<TopicKey[]> {
+  const db = await getDb();
+  const rows = await db.select({ key: trendSources.key, lastAttemptAt: trendSources.lastAttemptAt }).from(trendSources);
+  const state = new Map(rows.map((r) => [r.key, r.lastAttemptAt]));
+  const topics = new Set<TopicKey>();
+  for (const source of SOURCES) if (!state.get(source.key)) topics.add(source.topic);
+  return [...topics];
+}
+
 /** Time since any source was last attempted; drives the self-healing refresh when the cron is down. */
 export async function staleness(): Promise<number> {
   const db = await getDb();
@@ -319,4 +329,52 @@ export async function randomTrend(viewers: Viewers, topic: TopicKey, exclude?: s
     .orderBy(sql`random()`)
     .limit(1);
   return row ? (await attachReactions([row], viewers))[0] : null;
+}
+
+// ─── Browser search ───────────────────────────────────────────────────────
+
+/** LIKE is not a place for user wildcards: make the query a literal. */
+const likePattern = (q: string) => `%${q.replace(/[\\%_]/g, "\\$&").replace(/\s+/g, " ").trim()}%`;
+
+/**
+ * Full search inside the couple's copy of the world's feeds. Titles that match
+ * come first, then recent items; the person's muted sources, categories and
+ * keywords still apply, so search never resurrects content they hid.
+ */
+export async function searchTrends(viewers: Viewers, opts: { query: string; personId: string | null; limit?: number }): Promise<TrendCard[]> {
+  const db = await getDb();
+  const like = likePattern(opts.query);
+  const rows = await db
+    .select()
+    .from(trends)
+    .where(
+      and(
+        or(ilike(trends.title, like), ilike(trends.summary, like), ilike(trends.category, like), sql`array_to_string(${trends.tags}, ' ') ilike ${like}`),
+        ...(await prefFilters(opts.personId)),
+      ),
+    )
+    .orderBy(sql`case when ${trends.title} ilike ${like} then 0 else 1 end`, desc(trends.publishedAt), desc(trends.id))
+    .limit(Math.min(opts.limit ?? 10, 24));
+  return attachReactions(rows, viewers);
+}
+
+export type TrendSuggestion = { id: string; title: string; topic: TopicKey; category: string; sourceName: string };
+
+/**
+ * Type-ahead suggestions that stay inside Lovora. Nothing is sent to a search
+ * engine while someone types: the browser only asks the web when they press
+ * Enter. An empty query suggests the freshest stored items.
+ */
+export async function suggestTrends(personId: string | null, query: string, limit = 6): Promise<TrendSuggestion[]> {
+  const db = await getDb();
+  const q = query.replace(/\s+/g, " ").trim();
+  const like = likePattern(q);
+  const filters = await prefFilters(personId);
+  const rows = await db
+    .select({ id: trends.id, title: trends.title, topic: trends.topic, category: trends.category, sourceName: trends.sourceName })
+    .from(trends)
+    .where(q ? and(or(ilike(trends.title, like), ilike(trends.category, like), ilike(trends.sourceName, like)), ...filters) : and(...filters))
+    .orderBy(...(q ? [sql`case when ${trends.title} ilike ${like} then 0 else 1 end`, desc(trends.publishedAt)] : [desc(trends.publishedAt)]))
+    .limit(Math.min(limit, 10));
+  return rows.map((r) => ({ ...r, topic: r.topic as TopicKey })).filter((r) => isTopicKey(r.topic));
 }

@@ -189,6 +189,20 @@ export const SOURCES: SourceDef[] = [
   rss("carbon-brief", "Carbon Brief", "https://www.carbonbrief.org/feed/", "environment", 7),
   rss("yale-e360", "Yale Environment 360", "https://e360.yale.edu/feed.xml", "environment", 2, { every: 180 }),
   rss("sd-envsci", "ScienceDaily · Environmental Science", "https://www.sciencedaily.com/rss/earth_climate/environmental_science.xml", "environment", 4),
+
+  // ⚽ Football
+  rss("bbc-football", "BBC Sport · Football", "https://feeds.bbci.co.uk/sport/football/rss.xml", "football", 1, { every: 30 }),
+  rss("guardian-football", "The Guardian · Football", "https://www.theguardian.com/football/rss", "football", 6, { every: 30 }),
+  rss("sky-football", "Sky Sports · Football", "https://www.skysports.com/rss/12040", "football", 6, { every: 30 }),
+  rss("espn-soccer", "ESPN · Soccer", "https://www.espn.com/espn/rss/soccer/news", "football", 6, { every: 30 }),
+
+  // 📰 News
+  rss("bbc-world", "BBC News · World", "https://feeds.bbci.co.uk/news/world/rss.xml", "news", 1, { every: 15 }),
+  rss("guardian-world", "The Guardian · World", "https://www.theguardian.com/world/rss", "news", 6, { every: 20 }),
+  rss("npr-world", "NPR · World", "https://feeds.npr.org/1004/rss.xml", "news", 3, { every: 30 }),
+  rss("aljazeera", "Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml", "news", 6, { every: 20 }),
+  rss("dw-world", "DW · World", "https://rss.dw.com/rdf/rss-en-world", "news", 1, { every: 30 }),
+  rss("france24", "France 24", "https://www.france24.com/en/rss", "news", 5, { every: 30 }),
 ];
 
 export const SOURCE_BY_KEY = new Map(SOURCES.map((s) => [s.key, s]));

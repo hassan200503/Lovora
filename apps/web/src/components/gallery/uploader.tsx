@@ -7,7 +7,7 @@ import { addYouTube } from "@/lib/actions/media";
 import { kindOf, uploadToGallery } from "@/lib/media/client-upload";
 import { UsageMeter } from "@/components/ui/usage";
 import { IconCamera, IconFilm, IconMusic } from "@/components/icons";
-import { YouTubeDiscovery } from "./discover";
+import { YouTubeDiscovery } from "@/components/youtube/discover";
 
 type Job = { key: string; file: File; pct: number; stage: string; error?: string; done?: boolean; ctrl: AbortController };
 type Storage = { used: number; limit: number };

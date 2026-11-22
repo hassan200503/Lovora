@@ -23,6 +23,31 @@ type Detail = {
   embeddable: boolean | null;
 };
 
+/** What the Together room can do with a video found here. */
+export type RoomDiscoverActions = {
+  watch: (item: DiscoverItem, detail?: Detail) => void;
+  queue: (item: DiscoverItem, detail?: Detail) => void;
+  isWatching: (videoId: string) => boolean;
+  isQueued: (videoId: string) => boolean;
+};
+
+export type DiscoverActionsProps =
+  | { variant?: "gallery"; room?: undefined }
+  | { variant: "room"; room: RoomDiscoverActions };
+
+type RowAction = {
+  label: string;
+  icon?: "play" | "plus" | "check" | "spinner";
+  disabled?: boolean;
+  onClick: () => void;
+};
+
+type Row = {
+  badge?: string;
+  primary: RowAction;
+  secondary?: RowAction;
+};
+
 const EMOJI: Record<DiscoverCategory, string> = {
   movies: "🎬",
   music: "🎵",
@@ -32,6 +57,7 @@ const EMOJI: Record<DiscoverCategory, string> = {
 };
 
 const SUGGESTIONS = ["Full movies tonight", "Lo-fi to study", "Funny shorts", "Live news", "Animated films"];
+const ROOM_SUGGESTIONS = [...SUGGESTIONS, "Knitting tutorials", "Bird videos"];
 
 function duration(sec: number | null) {
   if (sec === null) return "";
@@ -97,28 +123,41 @@ function SetupCard() {
   );
 }
 
-function Card({
-  item,
-  detail,
-  isAdded,
-  busy,
-  shelf = false,
-  onAdd,
-  onPreview,
-}: {
-  item: DiscoverItem;
-  detail?: Detail;
-  isAdded: boolean;
-  busy: boolean;
-  shelf?: boolean;
-  onAdd: () => void;
-  onPreview: () => void;
-}) {
+function ActionButton({ action, primary }: { action: RowAction; primary: boolean }) {
+  const icon =
+    action.icon === "play" ? (
+      <IconPlay size={12} />
+    ) : action.icon === "check" ? (
+      <IconCheck size={12} />
+    ) : action.icon === "spinner" ? (
+      <IconSpinner size={12} />
+    ) : action.icon === "plus" ? (
+      <IconPlus size={12} />
+    ) : null;
+  return (
+    <button
+      type="button"
+      disabled={action.disabled}
+      onClick={action.onClick}
+      aria-label={action.label}
+      className={
+        primary
+          ? "btn min-w-0 flex-1 gap-1 px-2 py-1.5 text-[0.7rem]"
+          : "btn btn-ghost min-w-0 flex-1 gap-1 border border-line px-2 py-1.5 text-[0.7rem]"
+      }
+    >
+      {icon}
+      <span className="truncate">{action.label}</span>
+    </button>
+  );
+}
+
+function Card({ item, detail, row, shelf = false, onPreview }: { item: DiscoverItem; detail?: Detail; row: Row; shelf?: boolean; onPreview: () => void }) {
   const [loaded, setLoaded] = useState(false);
   const length = detail?.durationSec ?? item.durationSec;
   const count = detail?.viewCount ?? item.viewCount;
   return (
-    <article className={shelf ? "w-[68vw] max-w-[238px] shrink-0 snap-start sm:w-[232px]" : "min-w-0"}>
+    <article className={shelf ? "w-[68vw] max-w-[244px] shrink-0 snap-start sm:w-[240px]" : "min-w-0"}>
       <button
         type="button"
         onClick={onPreview}
@@ -147,9 +186,9 @@ function Card({
             {duration(length)}
           </span>
         ) : null}
-        {isAdded && (
+        {row.badge && (
           <span className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[0.62rem] font-bold uppercase tracking-wide text-white shadow">
-            <IconCheck size={10} /> In gallery
+            <IconCheck size={10} /> {row.badge}
           </span>
         )}
       </button>
@@ -161,27 +200,10 @@ function Card({
           {item.channel}
           {count ? ` · ${views(count)}` : ""}
         </p>
-        <button
-          type="button"
-          className="btn mt-1.5 w-full py-1.5 text-xs"
-          disabled={isAdded || busy}
-          onClick={onAdd}
-          aria-label={isAdded ? `${item.title} is already added` : `Add ${item.title} to the shared gallery`}
-        >
-          {isAdded ? (
-            <>
-              <IconCheck size={13} /> Added
-            </>
-          ) : busy ? (
-            <>
-              <IconSpinner size={13} /> Adding…
-            </>
-          ) : (
-            <>
-              <IconPlus size={13} /> Add
-            </>
-          )}
-        </button>
+        <div className="mt-1.5 flex items-center gap-1">
+          <ActionButton action={row.primary} primary />
+          {row.secondary && <ActionButton action={row.secondary} primary={false} />}
+        </div>
       </div>
     </article>
   );
@@ -190,16 +212,12 @@ function Card({
 function Shelf({
   category,
   onUnconfigured,
-  isAdded,
-  isBusy,
-  onAdd,
+  rowFor,
   onPreview,
 }: {
   category: DiscoverCategory;
   onUnconfigured: () => void;
-  isAdded: (videoId: string) => boolean;
-  isBusy: (videoId: string) => boolean;
-  onAdd: (item: DiscoverItem, collection: DiscoverCategory, detail?: Detail) => void;
+  rowFor: (item: DiscoverItem, collection: DiscoverCategory, detail: Detail | undefined, added: boolean) => Row;
   onPreview: (item: DiscoverItem, collection: DiscoverCategory, detail?: Detail) => void;
 }) {
   const cfg = DISCOVER_CATEGORIES[category];
@@ -290,13 +308,14 @@ function Shelf({
 
       <div
         ref={scroller}
+        role="group"
         tabIndex={0}
         aria-label={`${cfg.label} shelf`}
         className="no-scrollbar -mx-1 mt-2 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-1 pb-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         {!q.data &&
           Array.from({ length: 6 }, (_, i) => (
-            <div key={`sk-${i}`} className="w-[68vw] max-w-[238px] shrink-0 snap-start sm:w-[232px]">
+            <div key={`sk-${i}`} className="w-[68vw] max-w-[244px] shrink-0 snap-start sm:w-[240px]">
               <div className="skeleton aspect-video w-full rounded-xl" />
               <div className="mt-2 space-y-1.5">
                 <div className="skeleton h-3 w-11/12 rounded" />
@@ -311,9 +330,7 @@ function Shelf({
             item={item}
             detail={detailFor(item.videoId)}
             shelf
-            isAdded={serverAdded.has(item.videoId) || isAdded(item.videoId)}
-            busy={isBusy(item.videoId)}
-            onAdd={() => onAdd(item, category, detailFor(item.videoId))}
+            row={rowFor(item, category, detailFor(item.videoId), serverAdded.has(item.videoId))}
             onPreview={() => onPreview(item, category, detailFor(item.videoId))}
           />
         ))}
@@ -336,16 +353,12 @@ function Shelf({
 function SearchResults({
   query,
   onUnconfigured,
-  isAdded,
-  isBusy,
-  onAdd,
+  rowFor,
   onPreview,
 }: {
   query: string;
   onUnconfigured: () => void;
-  isAdded: (videoId: string) => boolean;
-  isBusy: (videoId: string) => boolean;
-  onAdd: (item: DiscoverItem, collection: DiscoverCategory | null, detail?: Detail) => void;
+  rowFor: (item: DiscoverItem, collection: DiscoverCategory | null, detail: Detail | undefined, added: boolean) => Row;
   onPreview: (item: DiscoverItem, collection: DiscoverCategory | null, detail?: Detail) => void;
 }) {
   const q = useInfiniteQuery({
@@ -386,6 +399,8 @@ function SearchResults({
   useEffect(() => {
     if (configured === false) onUnconfigured();
   }, [configured, onUnconfigured]);
+
+  const collectionFor = (item: DiscoverItem) => (details.data?.[item.videoId]?.categoryId === "10" ? "music" : null);
 
   return (
     <div className="mt-4" aria-busy={q.isFetching}>
@@ -430,13 +445,8 @@ function SearchResults({
                 key={item.videoId}
                 item={item}
                 detail={details.data?.[item.videoId]}
-                isAdded={serverAdded.has(item.videoId) || isAdded(item.videoId)}
-                busy={isBusy(item.videoId)}
-                onAdd={() => {
-                  const detail = details.data?.[item.videoId];
-                  onAdd(item, detail?.categoryId === "10" ? "music" : null, detail);
-                }}
-                onPreview={() => onPreview(item, details.data?.[item.videoId]?.categoryId === "10" ? "music" : null, details.data?.[item.videoId])}
+                row={rowFor(item, collectionFor(item), details.data?.[item.videoId], serverAdded.has(item.videoId))}
+                onPreview={() => onPreview(item, collectionFor(item), details.data?.[item.videoId])}
               />
             ))}
           </div>
@@ -467,8 +477,14 @@ function SearchResults({
   );
 }
 
-/** Live YouTube search and horizontal shelves. Anything added lands in the shared gallery at once. */
-export function YouTubeDiscovery() {
+/**
+ * Live YouTube search and shelves. In the gallery, anything added lands in the
+ * shared gallery at once; in the Together room the same cards start a shared
+ * playback (Watch together) or append to the room queue.
+ */
+export function YouTubeDiscovery(props: DiscoverActionsProps) {
+  const variant = props.variant ?? "gallery";
+  const room = props.variant === "room" ? props.room : undefined;
   const [text, setText] = useState("");
   const [query, setQuery] = useState("");
   const [preview, setPreview] = useState<{ item: DiscoverItem; collection: DiscoverCategory | null; detail?: Detail } | null>(null);
@@ -540,10 +556,51 @@ export function YouTubeDiscovery() {
     }
   }
 
+  const rowFor = useCallback(
+    (item: DiscoverItem, collection: DiscoverCategory | null, detail: Detail | undefined, added: boolean): Row => {
+      if (room) {
+        const watching = room.isWatching(item.videoId);
+        const queued = room.isQueued(item.videoId);
+        return {
+          badge: watching ? "Watching" : queued ? "In queue" : undefined,
+          primary: {
+            label: watching ? "Playing" : "Watch together",
+            icon: watching ? "check" : "play",
+            disabled: watching,
+            onClick: () => {
+              setPreview(null);
+              room.watch(item, detail);
+            },
+          },
+          secondary: {
+            label: queued ? "Queued" : "Add to queue",
+            icon: queued ? "check" : "plus",
+            disabled: queued || watching,
+            onClick: () => room.queue(item, detail),
+          },
+        };
+      }
+      const isAdded = added || addedSet.has(item.videoId);
+      const busy = isBusy(item.videoId);
+      return {
+        badge: isAdded ? "In gallery" : undefined,
+        primary: {
+          label: isAdded ? "Added" : busy ? "Adding…" : "Add",
+          icon: isAdded ? "check" : busy ? "spinner" : "plus",
+          disabled: isAdded || busy,
+          onClick: () => void add(item, collection, detail),
+        },
+      };
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `add` closes over the same state as these
+    [room, addedSet, isBusy],
+  );
+
   const normalized = text.replace(/\s+/g, " ").trim();
   const activeQuery = normalized.length >= 2 ? query : "";
   const searching = activeQuery.length >= 2;
   const suggestionsOpen = normalized.length === 0;
+  const suggestions = variant === "room" ? ROOM_SUGGESTIONS : SUGGESTIONS;
 
   return (
     <div className="mt-6 border-t border-line pt-5">
@@ -554,8 +611,9 @@ export function YouTubeDiscovery() {
         <div>
           <h3 className="type-section-title text-base">Search from YouTube live</h3>
           <p className="mt-0.5 text-xs text-muted">
-            Type any film, song, short, animation or news clip by name — or browse a shelf. Preview it, then press Add and it
-            appears in your Shared gallery for both of you straight away.
+            {room
+              ? "Type any film, song, short, animation or news clip — or browse a shelf. Preview it, then press Watch together to start it for both of you, or Add to queue to keep it for later."
+              : "Type any film, song, short, animation or news clip by name — or browse a shelf. Preview it, then press Add and it appears in your Shared gallery for both of you straight away."}
           </p>
         </div>
       </div>
@@ -576,7 +634,7 @@ export function YouTubeDiscovery() {
             setText(e.target.value);
             if (e.target.value.replace(/\s+/g, " ").trim().length < 2) setQuery("");
           }}
-          placeholder="Search YouTube by name — “Adele”, “full movie”, “funny shorts”…"
+          placeholder={room ? "Find something for tonight — “full movie”, “lo-fi”, “funny shorts”…" : "Search YouTube by name — “Adele”, “full movie”, “funny shorts”…"}
           className="field pl-10 pr-20 text-sm"
           aria-label="Search YouTube"
           autoComplete="off"
@@ -603,7 +661,7 @@ export function YouTubeDiscovery() {
 
       {suggestionsOpen && (
         <div className="no-scrollbar mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
-          {SUGGESTIONS.map((s) => (
+          {suggestions.map((s) => (
             <button key={s} type="button" className="chip chip-quiet shrink-0" onClick={() => setText(s)}>
               {s}
             </button>
@@ -621,9 +679,7 @@ export function YouTubeDiscovery() {
         <SearchResults
           query={activeQuery}
           onUnconfigured={markUnconfigured}
-          isAdded={(id) => addedSet.has(id)}
-          isBusy={isBusy}
-          onAdd={add}
+          rowFor={rowFor}
           onPreview={(item, collection, detail) => setPreview({ item, collection, detail })}
         />
       ) : (
@@ -633,9 +689,7 @@ export function YouTubeDiscovery() {
               key={category}
               category={category}
               onUnconfigured={markUnconfigured}
-              isAdded={(id) => addedSet.has(id)}
-              isBusy={isBusy}
-              onAdd={add}
+              rowFor={rowFor}
               onPreview={(item, collection, detail) => setPreview({ item, collection, detail })}
             />
           ))}
@@ -693,26 +747,28 @@ export function YouTubeDiscovery() {
                 >
                   Open on YouTube
                 </a>
-                <button
-                  type="button"
-                  className="btn px-4 py-1.5 text-xs"
-                  disabled={addedSet.has(preview.item.videoId) || isBusy(preview.item.videoId)}
-                  onClick={() => add(preview.item, preview.collection, preview.detail)}
-                >
-                  {addedSet.has(preview.item.videoId) ? (
+                {(() => {
+                  const row = rowFor(preview.item, preview.collection, preview.detail, addedSet.has(preview.item.videoId));
+                  return (
                     <>
-                      <IconCheck size={13} /> In gallery
+                      {row.secondary && (
+                        <button
+                          type="button"
+                          disabled={row.secondary.disabled}
+                          onClick={row.secondary.onClick}
+                          className="btn btn-ghost border-white/20 px-4 py-1.5 text-xs text-white"
+                        >
+                          {row.secondary.icon === "check" ? <IconCheck size={13} /> : <IconPlus size={13} />}
+                          {row.secondary.label}
+                        </button>
+                      )}
+                      <button type="button" disabled={row.primary.disabled} onClick={row.primary.onClick} className="btn px-4 py-1.5 text-xs">
+                        {row.primary.icon === "check" ? <IconCheck size={13} /> : row.primary.icon === "spinner" ? <IconSpinner size={13} /> : row.primary.icon === "play" ? <IconPlay size={13} /> : <IconPlus size={13} />}
+                        {row.primary.label}
+                      </button>
                     </>
-                  ) : isBusy(preview.item.videoId) ? (
-                    <>
-                      <IconSpinner size={13} /> Adding…
-                    </>
-                  ) : (
-                    <>
-                      <IconPlus size={13} /> Add to our gallery
-                    </>
-                  )}
-                </button>
+                  );
+                })()}
               </div>
             </div>
           </div>

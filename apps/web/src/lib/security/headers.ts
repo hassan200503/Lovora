@@ -35,7 +35,7 @@ export function contentSecurityPolicy(nonce: string, options: { dev?: boolean } 
     "media-src 'self' blob: https:",
     "font-src 'self' data:",
     "connect-src 'self' https://vercel.com https://blob.vercel-storage.com https://*.blob.vercel-storage.com https://www.youtube.com https://www.youtube-nocookie.com",
-    "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
+    "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://www.tiktok.com",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "object-src 'none'",

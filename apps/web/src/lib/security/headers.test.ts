@@ -20,6 +20,7 @@ describe("security headers", () => {
     expect(policy).toContain("'strict-dynamic'");
     expect(policy).toContain("https://www.youtube.com");
     expect(policy).toContain("https://www.youtube-nocookie.com");
+    expect(policy).toContain("https://www.tiktok.com");
     expect(policy).toContain("frame-ancestors 'none'");
     expect(policy).toContain("object-src 'none'");
     expect(policy).toContain("report-uri /api/csp-report");

@@ -16,7 +16,9 @@ export type TopicKey =
   | "biotech"
   | "birds"
   | "knitting"
-  | "environment";
+  | "environment"
+  | "football"
+  | "news";
 
 export type Topic = {
   key: TopicKey;
@@ -183,6 +185,47 @@ export const TOPICS: Record<TopicKey, Topic> = {
       { name: "Water & oceans", match: r("ocean|water|river|glacier|ice|sea level") },
     ],
   },
+  football: {
+    key: "football",
+    label: "Football",
+    emoji: "⚽",
+    blurb: "Live football: the Premier League, Champions League, transfers, Africa, women's football and the analysis behind the results.",
+    cadence: "live",
+    fallbackCategory: "Football news",
+    categories: [
+      { name: "Champions League", match: r("champions league|uefa|ucl|european cup") },
+      { name: "Premier League", match: r("premier league|epl|arsenal|chelsea|liverpool|manchester (united|city)|tottenham|newcastle|villa|everton") },
+      { name: "La Liga", match: r("la liga|real madrid|barcelona|atletico|sevilla|valencia") },
+      { name: "Serie A", match: r("serie a|juventus|inter milan|ac milan|napoli|roma|lazio") },
+      { name: "Bundesliga", match: r("bundesliga|bayern|dortmund|leverkusen|leipzig") },
+      { name: "Transfers", match: r("transfer|signing|signs|loan|contract|deal|bid|fee|medical") },
+      { name: "World Cup", match: r("world cup|qualifier|afcon|africa cup|copa america|euro \\d{4}|euros") },
+      { name: "Women's football", match: r("women|wsl|nwsl|matildas|lionesses|shebelieves") },
+      { name: "Africa", match: r("africa|kenya|nigeria|ghana|south africa|egypt|morocco|senegal|tanzania|uganda|zambia|ivory coast|cameroon") },
+      { name: "Analysis", match: r("analysis|tactics|tactical|preview|review|ratings|player ratings|explained") },
+      { name: "Results", match: r("result|score|beat|draw|win|loss|highlights|match report|fixtures") },
+    ],
+  },
+  news: {
+    key: "news",
+    label: "News",
+    emoji: "📰",
+    blurb: "World news from established public-service and independent outlets, with context and a link to every original report.",
+    cadence: "live",
+    fallbackCategory: "World news",
+    categories: [
+      { name: "World", match: r("world|global|international|united nations|summit|conflict|war|border") },
+      { name: "Politics", match: r("politic|election|parliament|congress|senate|president|minister|government|vote|policy") },
+      { name: "Business", match: r("business|market|econom|trade|bank|inflation|company|jobs|finance|tariff") },
+      { name: "Science & health", match: r("science|health|medicine|vaccine|research|study|disease|hospital|climate") },
+      { name: "Climate", match: r("climate|warming|emission|carbon|weather|flood|drought|wildfire") },
+      { name: "Culture", match: r("culture|film|music|art|book|festival|award|fashion") },
+      { name: "Africa", match: r("africa|kenya|nigeria|ghana|south africa|ethiopia|sudan|egypt|morocco|somalia|tanzania|uganda") },
+      { name: "Asia", match: r("asia|china|india|japan|korea|indonesia|pakistan|bangladesh|philippines|vietnam") },
+      { name: "Europe", match: r("europe|eu\\b|brussels|france|germany|italy|spain|uk|britain|ukraine|russia") },
+      { name: "Americas", match: r("america|united states|u\\.s\\.|canada|mexico|brazil|argentina|chile|colombia") },
+    ],
+  },
 };
 
 export const TOPIC_KEYS = Object.keys(TOPICS) as TopicKey[];
@@ -222,6 +265,8 @@ const TOPIC_TAG: Record<TopicKey, string> = {
   birds: "birds",
   knitting: "craft",
   environment: "climate",
+  football: "sport",
+  news: "news",
 };
 
 export function tagsFor(topic: TopicKey, text: string): string[] {
