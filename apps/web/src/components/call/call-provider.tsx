@@ -10,7 +10,8 @@ import { unlockAudio } from "./tones";
 type CallApi = {
   snap: Snapshot;
   engine: CallEngine;
-  start: (kind: "audio" | "video") => void;
+  /** `minimize: true` keeps the movie on screen and puts the call in its floating pill. */
+  start: (kind: "audio" | "video", opts?: { minimize?: boolean }) => void;
   minimized: boolean;
   setMinimized: (v: boolean) => void;
 };
@@ -43,8 +44,24 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const { data, refresh } = usePulse();
   // Minimised applies to one call only; the next call always opens full screen.
   const [minimizedId, setMinimizedId] = useState<string | null>(null);
-  const minimized = !!minimizedId && minimizedId === snap.call?.id;
+  // Set while a call started from the movie room is still being set up, so its screen never flashes full size.
+  const [startMinimized, setStartMinimized] = useState(false);
+  const minimized = startMinimized || (!!minimizedId && minimizedId === snap.call?.id);
   const setMinimized = useCallback((v: boolean) => setMinimizedId(v ? (engine.snapshot.call?.id ?? null) : null), [engine]);
+
+  useEffect(() => {
+    if (!startMinimized) return;
+    if (snap.call?.id && (snap.phase === "outgoing" || snap.phase === "connecting")) {
+      const id = snap.call.id;
+      // The engine reports the call id a round trip after `start`; apply the pill once it exists.
+      queueMicrotask(() => {
+        setMinimizedId(id);
+        setStartMinimized(false);
+      });
+    } else if (snap.phase === "ended" || snap.phase === "idle") {
+      queueMicrotask(() => setStartMinimized(false));
+    }
+  }, [startMinimized, snap.call?.id, snap.phase]);
 
   const call = data?.call ?? null;
   useEffect(() => {
@@ -76,8 +93,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   }, [engine]);
 
   const start = useCallback(
-    (kind: "audio" | "video") => {
+    (kind: "audio" | "video", opts?: { minimize?: boolean }) => {
       setMinimizedId(null);
+      setStartMinimized(!!opts?.minimize);
       void engine.start(kind);
     },
     [engine],

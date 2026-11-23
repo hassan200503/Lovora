@@ -15,7 +15,10 @@ Status: internal working document, not the public privacy policy. Legal review i
 
 | Category | Examples | Purpose | Where | Retention (proposed) | Access |
 | --- | --- | --- | --- | --- | --- |
-| Account | Email, display name, auth id, OAuth identity, avatar | Sign-in, identity, support | Supabase Auth + profiles | Until deletion + 30-day grace | User, support (break-glass) |
+| Account | Email, display name, auth id, avatar | Sign-in, identity, support | Postgres (`people`) | Until deletion + 30-day grace | User, support (break-glass) |
+| Auth identities | Google subject id, verified email, provider timestamps | Google sign-in linking | Postgres (`auth_identities`) | Until unlinked or deletion | User, support |
+| Recovery codes | One-way hash of the offline code | Account recovery | Postgres (`people.recovery_hash`) | Until rotated or deletion | None (hash only) |
+| Email recovery | Email, HMAC code hash, salt, IP hash, attempt count, expiry | Password reset verification | Postgres (`email_otps`) | Removed by the next recovery sweep after 24 hours | Security/support (metadata) |
 | Couple | Couple id, member roles, start date, world names, time zone, topics | Personalisation, rituals | Postgres | Until deletion | Both members |
 | Invitations | Email/token hash, expiry, inviter | Partner linking | Postgres | 30 days after expiry/use | Inviter, support |
 | Messages | Text, media refs, replies, reactions, receipts, typing (ephemeral) | Core communication | Postgres + Storage | Until user deletion (configurable retention post-launch) | Couple |
@@ -52,7 +55,8 @@ Not collected in v1: precise location, contacts, advertising ids, biometrics, he
 | Expo/EAS | Build artifacts, push tokens | Mobile builds/push | US (verify DPA) |
 | Sentry | Error traces, pseudonymous ids | Diagnostics | Configure EU/US region; scrub PII |
 | TURN provider | IP/port metadata during calls | Relay | Region-dependent; short-lived |
-| Transactional email | Email address, OTP/links | Auth and account notices | Verify DPA |
+| Transactional email (Resend or Brevo) | Email address, message subject/body containing a one-time code | Password recovery email | Provider account; verify DPA and region |
+| Google Identity (OAuth) | Verified email, name, Google subject id; Google sees the browser IP/device during the redirect | Sign-in/sign-up with Google | Google terms; acts as a separate controller for its own data |
 | Google (Gemini/YouTube) | Prompt context; YouTube embeds receive IP/device data | AI research; video playback | Google terms; YouTube embed acts as a separate controller for playback data |
 | OpenAlex/iNaturalist/feeds | Public content queries | Discover | Public APIs; no user data beyond request metadata |
 

@@ -51,6 +51,16 @@ const BY_TOPIC: Record<TopicKey, Suggestion[]> = {
     { q: "Teach me how the carbon cycle works", mode: "learn" },
     { q: "Explain what a carbon footprint really measures", mode: "explain" },
   ],
+  football: [
+    { q: "What does sports science research say about preventing hamstring injuries?", mode: "research" },
+    { q: "Teach me how offside is judged in football", mode: "learn" },
+    { q: "Explain how VAR works", mode: "explain" },
+  ],
+  news: [
+    { q: "What does research say about how news framing shapes public opinion?", mode: "research" },
+    { q: "Teach me how to tell a reliable news source from a misleading one", mode: "learn" },
+    { q: "Explain what inflation actually measures", mode: "explain" },
+  ],
 };
 
 const GENERAL: Suggestion[] = [

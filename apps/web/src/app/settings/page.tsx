@@ -6,7 +6,7 @@ import { preferences } from "@/lib/db/schema";
 import { personTopics } from "@/lib/trends/query";
 import { SOURCES } from "@/lib/trends/sources";
 import { TOPICS, TOPIC_KEYS } from "@/lib/trends/topics";
-import { changePassword, rotateRecoveryCode, saveFeatures, saveInterests, savePreferences, saveProfile, saveRelationship, signOutEverywhere } from "@/lib/actions/personal";
+import { changePassword, rotateRecoveryCode, saveFeatures, saveInterests, savePreferences, saveProfile, saveRelationship, setPassword, signOutEverywhere } from "@/lib/actions/personal";
 import { ActionForm, Field, RecoveryForm } from "@/components/ui/forms";
 import { AvatarPicker } from "@/components/avatar-picker";
 import { AlertsSetting } from "@/components/push";
@@ -292,27 +292,46 @@ export default async function SettingsPage() {
               <h2 className="type-section-title">Account</h2>
               <p className="mt-1 text-sm text-muted">
                 You sign in as <span className="font-semibold text-ink">{me.email}</span>.
+                {me.passwordSet ? null : " Your Google account is linked; no password is set yet."}
               </p>
-              <ActionForm action={changePassword} submit="Change password" className="mt-3 space-y-3">
-                <Field label="Current password" name="current">
-                  <PasswordInput id="current" name="current" autoComplete="current-password" />
-                </Field>
-                <Field label="New password" name="next" hint="(10+ characters)">
-                  <PasswordInput id="next" name="next" autoComplete="new-password" minLength={10} />
-                </Field>
-                <Field label="New password again" name="confirm">
-                  <PasswordInput id="confirm" name="confirm" autoComplete="new-password" minLength={10} />
-                </Field>
-              </ActionForm>
+              {me.passwordSet ? (
+                <ActionForm action={changePassword} submit="Change password" className="mt-3 space-y-3">
+                  <Field label="Current password" name="current">
+                    <PasswordInput id="current" name="current" autoComplete="current-password" />
+                  </Field>
+                  <Field label="New password" name="next" hint="(10+ characters)">
+                    <PasswordInput id="next" name="next" autoComplete="new-password" minLength={10} />
+                  </Field>
+                  <Field label="New password again" name="confirm">
+                    <PasswordInput id="confirm" name="confirm" autoComplete="new-password" minLength={10} />
+                  </Field>
+                </ActionForm>
+              ) : (
+                <ActionForm action={setPassword} submit="Set password" className="mt-3 space-y-3">
+                  <p className="text-xs leading-relaxed text-muted">
+                    Add a password so this account can also sign in without Google. Other devices will be signed out.
+                  </p>
+                  <Field label="New password" name="next" hint="(10+ characters)">
+                    <PasswordInput id="new-password" name="next" autoComplete="new-password" minLength={10} />
+                  </Field>
+                  <Field label="New password again" name="confirm">
+                    <PasswordInput id="new-confirm" name="confirm" autoComplete="new-password" minLength={10} />
+                  </Field>
+                </ActionForm>
+              )}
               <div className="mt-5 border-t border-line/70 pt-4">
-                <p className="text-sm font-semibold">Recovery code</p>
+                <p className="text-sm font-semibold">Recovery</p>
                 <p className="mt-1 text-xs leading-relaxed text-muted">
-                  If you forget your password, this code is the only way back in. Make a fresh one and store it in your password manager; the previous code stops working.
+                  {me.passwordSet
+                    ? "If you forget your password, a 6-digit code is emailed to your address. This saved code is the offline fallback. Making a new one stops the previous code."
+                    : "Your account recovers with a 6-digit code emailed to your address. You can also keep an offline recovery code as a fallback."}
                 </p>
                 <RecoveryForm action={rotateRecoveryCode} submit="Generate a new code" continueHref="/settings" title="Your new recovery code" className="mt-3 space-y-3">
-                  <Field label="Current password" name="current-recovery">
-                    <PasswordInput id="current-recovery" name="current" autoComplete="current-password" />
-                  </Field>
+                  {me.passwordSet && (
+                    <Field label="Current password" name="current-recovery">
+                      <PasswordInput id="current-recovery" name="current" autoComplete="current-password" />
+                    </Field>
+                  )}
                 </RecoveryForm>
               </div>
               <div className="mt-5 border-t border-line/70 pt-4">

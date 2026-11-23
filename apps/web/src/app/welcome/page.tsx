@@ -2,9 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BRAND, THEME_OPTIONS } from "@lovora/domain";
 import { getCtx } from "@/lib/context";
+import { googleConfigured } from "@/lib/auth/google";
 import { startWorld } from "@/lib/actions/onboarding";
 import { TOPICS, TOPIC_KEYS } from "@/lib/trends/topics";
 import { Field, RecoveryForm } from "@/components/ui/forms";
+import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Starfield } from "@/components/home/sky";
 import { IconArrowRight, Monogram } from "@/components/icons";
@@ -57,7 +59,16 @@ export default async function WelcomePage() {
           </div>
 
           <div className="fade-late rounded-[28px] border border-white/10 bg-white/[0.045] p-5 shadow-[0_40px_100px_-40px_rgb(0_0_0/0.8)] backdrop-blur-2xl sm:p-8" style={{ "--d": "200ms" } as React.CSSProperties}>
-            <RecoveryForm action={startWorld} submit="Create our world" submitClass="btn-gold" className="space-y-7">
+            {googleConfigured() && (
+              <div className="mb-7">
+                <GoogleButton href="/api/auth/google/start?intent=signup" label="Sign up with Google" />
+                <p className="mt-2.5 text-center text-xs leading-relaxed text-white/40">
+                  Google confirms your email. You&apos;ll name your world next.
+                </p>
+                <AuthDivider label="or start with email" />
+              </div>
+            )}
+            <RecoveryForm action={startWorld} continueHref="/api/auth/continue" submit="Create our world" submitClass="btn-gold" className="space-y-7">
               <section className="space-y-4">
                 <p className="eyebrow-lux text-white/50">You</p>
                 <Field label="Your name" name="displayName">

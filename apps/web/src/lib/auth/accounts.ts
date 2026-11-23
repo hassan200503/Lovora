@@ -4,8 +4,9 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import type { ThemeKey } from "@lovora/domain";
 import { getDb } from "@/lib/db/client";
-import { authAttempts, coupleMembers, couples, interests, people, preferences, profiles } from "@/lib/db/schema";
+import { authAttempts, authIdentities, coupleMembers, couples, interests, people, preferences, profiles } from "@/lib/db/schema";
 import { hashRecoveryCode, matchesRecovery, newRecoveryCode } from "./recovery";
+import type { GoogleProfile } from "./google";
 
 export { hashRecoveryCode, newRecoveryCode } from "./recovery";
 
@@ -133,7 +134,10 @@ export type MemberInput = {
   displayName: string;
   email: string;
   passwordHash: string;
-  recoveryHash: string;
+  /** Null for Google-created accounts; a code can be minted later from Settings. */
+  recoveryHash: string | null;
+  /** False until a Google-created account chooses a password. */
+  passwordSet?: boolean;
   theme: ThemeKey;
   topics: string[];
 };
@@ -149,6 +153,7 @@ export async function insertCoupleMember(tx: Tx, coupleId: string, slot: 1 | 2, 
       email: input.email,
       theme: input.theme,
       passwordHash: input.passwordHash,
+      passwordSet: input.passwordSet ?? true,
       recoveryHash: input.recoveryHash,
       journalTitle: "Learning Journal",
       radarTitle: "Curiosity Radar",
@@ -283,10 +288,52 @@ export async function changePassword(db: Db, personId: string, current: string, 
   return { ok: true, sessionVersion: updated.version };
 }
 
-/** Issues a new one-time recovery code after re-checking the current password. */
+/** Sets a first password for an account created through Google. */
+export async function setPassword(db: Db, personId: string, next: string): Promise<{ ok: true; sessionVersion: number } | AccountError> {
+  const issue = passwordProblem(next);
+  if (issue) return { ok: false, error: issue };
+  const [person] = await db.select({ passwordSet: people.passwordSet, version: people.sessionVersion }).from(people).where(eq(people.id, personId));
+  if (!person) return { ok: false, error: "Your account could not be found." };
+  if (person.passwordSet) return { ok: false, error: "A password is already set. Use Change password instead." };
+  const [updated] = await db
+    .update(people)
+    .set({ passwordHash: await hashPassword(next), passwordSet: true, sessionVersion: person.version + 1 })
+    .where(eq(people.id, personId))
+    .returning({ version: people.sessionVersion });
+  return { ok: true, sessionVersion: updated.version };
+}
+
+/**
+ * Completes an email-verified reset. The ticket carries the session version the
+ * account had when the code was verified, so a used or superseded ticket cannot
+ * be replayed after the password changes.
+ */
+export async function resetPassword(
+  db: Db,
+  input: { personId: string; expectedVersion: number; newPassword: string },
+): Promise<{ ok: true; slug: string; sessionVersion: number; recoveryCode: string } | AccountError> {
+  const issue = passwordProblem(input.newPassword);
+  if (issue) return { ok: false, error: issue };
+  const recoveryCode = newRecoveryCode();
+  const [updated] = await db
+    .update(people)
+    .set({
+      passwordHash: await hashPassword(input.newPassword),
+      passwordSet: true,
+      recoveryHash: hashRecoveryCode(recoveryCode),
+      sessionVersion: sql`${people.sessionVersion} + 1`,
+    })
+    .where(and(eq(people.id, input.personId), eq(people.sessionVersion, input.expectedVersion)))
+    .returning({ slug: people.slug, version: people.sessionVersion });
+  if (!updated) return { ok: false, error: "This reset has expired. Start again." };
+  return { ok: true, slug: updated.slug, sessionVersion: updated.version, recoveryCode };
+}
+
+/** Issues a new one-time recovery code after re-checking the current password (when there is one). */
 export async function rotateRecovery(db: Db, personId: string, current: string, code: string): Promise<boolean> {
-  const [person] = await db.select({ hash: people.passwordHash }).from(people).where(eq(people.id, personId));
-  if (!person || !(await verifyPassword(current, person.hash))) return false;
+  const [person] = await db.select({ hash: people.passwordHash, passwordSet: people.passwordSet }).from(people).where(eq(people.id, personId));
+  if (!person) return false;
+  if (person.passwordSet && !(await verifyPassword(current, person.hash))) return false;
   await db.update(people).set({ recoveryHash: hashRecoveryCode(code) }).where(eq(people.id, personId));
   return true;
 }
@@ -299,6 +346,120 @@ export async function revokeOtherSessions(db: Db, personId: string): Promise<num
     .where(eq(people.id, personId))
     .returning({ version: people.sessionVersion });
   return updated.version;
+}
+
+export type GoogleResolution =
+  | { ok: true; kind: "existing"; personId: string; slug: string; sessionVersion: number }
+  | { ok: true; kind: "onboarding" }
+  | AccountError;
+
+const GOOGLE_LINK_ERROR = "This Google account can't be used to sign in. Try another account or your password.";
+
+/**
+ * Looks up a verified Google identity by its stable subject, then by verified
+ * email. A first-time Google user is left in the onboarding step so no
+ * half-configured account is created.
+ */
+export async function resolveGoogleAccount(db: Db, profile: GoogleProfile): Promise<GoogleResolution> {
+  const email = normalizeEmail(profile.email);
+  if (!profile.providerAccountId || emailProblem(email)) return { ok: false, error: GOOGLE_LINK_ERROR };
+  if (!profile.emailVerified) return { ok: false, error: "Google could not verify this email address." };
+
+  const [linked] = await db
+    .select({ personId: authIdentities.personId })
+    .from(authIdentities)
+    .where(and(eq(authIdentities.provider, "google"), eq(authIdentities.providerAccountId, profile.providerAccountId)))
+    .limit(1);
+
+  if (linked) {
+    const [account] = await db
+      .select({ id: people.id, slug: coupleMembers.slug, version: people.sessionVersion })
+      .from(people)
+      .innerJoin(coupleMembers, and(eq(coupleMembers.personId, people.id), eq(coupleMembers.status, "active")))
+      .where(eq(people.id, linked.personId))
+      .limit(1);
+    if (!account) return { ok: false, error: GOOGLE_LINK_ERROR };
+    await db
+      .update(authIdentities)
+      .set({ lastUsedAt: new Date(), email, emailVerified: true })
+      .where(and(eq(authIdentities.provider, "google"), eq(authIdentities.providerAccountId, profile.providerAccountId)));
+    return { ok: true, kind: "existing", personId: account.id, slug: account.slug, sessionVersion: account.version };
+  }
+
+  const [byEmail] = await db
+    .select({ id: people.id, slug: coupleMembers.slug, version: people.sessionVersion })
+    .from(people)
+    .innerJoin(coupleMembers, and(eq(coupleMembers.personId, people.id), eq(coupleMembers.status, "active")))
+    .where(sql`lower(${people.email}) = ${email}`)
+    .limit(1);
+
+  if (!byEmail) return { ok: true, kind: "onboarding" };
+
+  try {
+    await db.insert(authIdentities).values({
+      personId: byEmail.id,
+      provider: "google",
+      providerAccountId: profile.providerAccountId,
+      email,
+      emailVerified: true,
+    });
+  } catch (error) {
+    if (duplicateEmail(error)) return { ok: false, error: GOOGLE_LINK_ERROR };
+    throw error;
+  }
+  return { ok: true, kind: "existing", personId: byEmail.id, slug: byEmail.slug, sessionVersion: byEmail.version };
+}
+
+export type GoogleRegisterInput = {
+  profile: GoogleProfile;
+  displayName: string;
+  theme: ThemeKey;
+  worldName: string;
+  startedOn?: string | null;
+  topics: string[];
+};
+
+export type OAuthRegistered = { ok: true; personId: string; slug: string; sessionVersion: number; coupleId: string };
+
+/** Creates a first world for a verified Google user, with no password until they choose one. */
+export async function createGoogleAccount(db: Db, input: GoogleRegisterInput): Promise<OAuthRegistered | AccountError> {
+  const email = normalizeEmail(input.profile.email);
+  const worldName = input.worldName.trim().slice(0, 60);
+  const problem = emailProblem(email) ?? displayNameProblem(input.displayName);
+  if (problem) return { ok: false, error: problem };
+  if (!worldName) return { ok: false, error: "Name your world." };
+  if (!input.profile.emailVerified) return { ok: false, error: "Google could not verify this email address." };
+
+  const [existing] = await db.select({ id: people.id }).from(people).where(sql`lower(${people.email}) = ${email}`).limit(1);
+  if (existing) return { ok: false, error: "An account with this email already exists. Sign in with Google instead." };
+
+  const passwordHash = await hashPassword(randomBytes(32).toString("base64url"));
+  try {
+    const person = await db.transaction(async (tx) => {
+      const [couple] = await tx.insert(couples).values({ name: worldName, startedOn: input.startedOn ?? null }).returning();
+      const created = await insertCoupleMember(tx, couple.id, 1, {
+        displayName: input.displayName.trim(),
+        email,
+        passwordHash,
+        passwordSet: false,
+        recoveryHash: null,
+        theme: input.theme,
+        topics: input.topics,
+      });
+      await tx.insert(authIdentities).values({
+        personId: created.id,
+        provider: "google",
+        providerAccountId: input.profile.providerAccountId,
+        email,
+        emailVerified: true,
+      });
+      return { ...created, coupleId: couple.id };
+    });
+    return { ok: true, personId: person.id, slug: person.slug, sessionVersion: person.sessionVersion, coupleId: person.coupleId };
+  } catch (error) {
+    if (duplicateEmail(error)) return { ok: false, error: "An account with this email already exists. Sign in with Google instead." };
+    throw error;
+  }
 }
 
 export function personForEmail(db: Db, email: string) {

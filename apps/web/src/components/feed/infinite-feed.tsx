@@ -69,11 +69,12 @@ function Skeleton() {
   );
 }
 
-export function InfiniteFeed({ params, topics, empty }: { params: FeedParams; topics: TopicKey[]; empty?: React.ReactNode }) {
+export function InfiniteFeed({ params, topics, empty, initial }: { params: FeedParams; topics: TopicKey[]; empty?: React.ReactNode; initial?: FeedPage }) {
   const q = useInfiniteQuery({
     queryKey: ["feed", params],
     queryFn: ({ pageParam }) => fetchPage(params, pageParam),
     initialPageParam: null as string | null,
+    ...(initial ? { initialData: { pages: [initial], pageParams: [null] } } : {}),
     getNextPageParam: (last) => last.nextCursor,
   });
 

@@ -16,6 +16,8 @@ const TOPIC_WORLD: Record<string, string> = {
   knitting: "sage",
   environment: "sage",
   nature: "us",
+  football: "us",
+  news: "indigo",
 };
 
 const isLiving = (item: Card) => item.contentType === "observation" || item.contentType === "sound";

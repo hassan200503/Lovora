@@ -128,6 +128,7 @@
   }
 }
 
+
 /*
  * Component classes live in the components layer so Tailwind utilities on the
  * same element (padding, position, radius…) always win, as they should.
@@ -1000,44 +1001,6 @@
     20%,
     40% {
       transform: rotate(14deg);
-    }
-  }
-}
-
-/* ─── Love stories trailer on the home stage ───────────────────────────── */
-@layer components {
-  @media (prefers-reduced-motion: no-preference) {
-    .ls-scene {
-      animation: ls-scene-in 360ms var(--motion-ease-lux) both;
-    }
-    .ls-bg {
-      animation: ls-bg-in 800ms var(--motion-ease-standard) both;
-    }
-    .ls-progress {
-      transform-origin: left;
-      animation-name: ls-progress;
-      animation-timing-function: linear;
-      animation-fill-mode: both;
-    }
-  }
-  @keyframes ls-scene-in {
-    from {
-      opacity: 0;
-      transform: translateY(6px);
-    }
-  }
-  @keyframes ls-bg-in {
-    from {
-      opacity: 0;
-      transform: scale(1.04);
-    }
-  }
-  @keyframes ls-progress {
-    from {
-      transform: scaleX(0);
-    }
-    to {
-      transform: scaleX(1);
     }
   }
 }
@@ -2782,5 +2745,69 @@
     .lp-quote-band .lp-container {
       padding-inline: 1rem;
     }
+  }
+}
+
+/* Signed-in home: keep the shared milestones balanced after removing the trailer panel. */
+.home-page .home-hero .verse {
+  max-width: 22ch;
+  text-wrap: balance;
+}
+
+.home-milestone-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+}
+
+.home-milestone {
+  position: relative;
+  isolation: isolate;
+  min-height: 13rem;
+  overflow: hidden;
+  background:
+    radial-gradient(75% 100% at 100% 0%, color-mix(in oklab, var(--gold-soft) 65%, transparent), transparent 68%),
+    linear-gradient(145deg, var(--surface), color-mix(in oklab, var(--surface) 90%, var(--gold-soft)));
+  border-color: color-mix(in oklab, var(--gold-2) 30%, var(--line));
+  transition:
+    transform var(--motion-duration-lift) var(--motion-ease-lux),
+    border-color var(--motion-duration-base) var(--motion-ease-out),
+    box-shadow var(--motion-duration-lift) var(--motion-ease-lux);
+}
+
+.home-milestone::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: -4.5rem;
+  right: -3.5rem;
+  width: 13rem;
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in oklab, var(--gold-2) 24%, transparent);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1.1rem color-mix(in oklab, var(--gold-2) 7%, transparent),
+    0 0 0 2.2rem color-mix(in oklab, var(--gold-2) 4%, transparent);
+  pointer-events: none;
+}
+
+.home-milestone .num-lux {
+  min-width: 1ch;
+  font-size: clamp(3.8rem, 5vw, 4.5rem);
+  line-height: 0.9;
+  text-shadow: 0 8px 28px color-mix(in oklab, var(--accent) 12%, transparent);
+}
+
+a.home-milestone:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in oklab, var(--gold-2) 62%, var(--line));
+  box-shadow: var(--shadow-pop);
+}
+
+@media (max-width: 640px) {
+  .home-page .home-hero .verse {
+    max-width: 18ch;
+  }
+
+  .home-milestone {
+    min-height: 12rem;
   }
 }

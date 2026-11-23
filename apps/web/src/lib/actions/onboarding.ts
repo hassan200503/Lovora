@@ -1,13 +1,15 @@
 "use server";
 
 import { and, eq } from "drizzle-orm";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { THEME_KEYS } from "@lovora/domain";
 import { createSession } from "@/lib/auth/session";
 import { consumeInvitation, findInvitation } from "@/lib/auth/invite";
 import {
   consumeAttempt,
+  createGoogleAccount,
   displayNameProblem,
   emailProblem,
   hashPassword,
@@ -17,7 +19,14 @@ import {
   normalizeEmail,
   passwordProblem,
   registerCouple,
+  resolveGoogleAccount,
 } from "@/lib/auth/accounts";
+import { holdSession } from "@/lib/auth/continue";
+import {
+  GOOGLE_SIGNUP_AUDIENCE,
+  GOOGLE_SIGNUP_COOKIE,
+  verifyTicket,
+} from "@/lib/auth/tickets";
 import { getDb } from "@/lib/db/client";
 import { coupleMembers, couples } from "@/lib/db/schema";
 import { getCtx } from "@/lib/context";
@@ -80,9 +89,64 @@ export async function startWorld(_: ActionState, fd: FormData): Promise<ActionSt
   });
   if (!registered.ok) return { error: registered.error };
 
-  await createSession({ personId: registered.personId, slug: registered.slug, version: registered.sessionVersion });
-  revalidatePath("/", "layout");
+  await holdSession(registered.personId, registered.slug, registered.sessionVersion);
   return { ok: true, recoveryCode: registered.recoveryCode };
+}
+
+/** Finishes the Google first-run flow with the details Google cannot supply. */
+export async function completeGoogleSignup(_: ActionState, fd: FormData): Promise<ActionState> {
+  const jar = await cookies();
+  const ticket = await verifyTicket(GOOGLE_SIGNUP_AUDIENCE, jar.get(GOOGLE_SIGNUP_COOKIE)?.value);
+  const sub = typeof ticket?.sub === "string" ? ticket.sub : "";
+  const email = typeof ticket?.email === "string" ? ticket.email : "";
+  const suggestedName = typeof ticket?.name === "string" ? ticket.name : "";
+  if (!sub || !email) return { error: "Your Google sign-in expired. Start again." };
+  if (await getCtx()) {
+    jar.delete(GOOGLE_SIGNUP_COOKIE);
+    redirect("/");
+  }
+
+  const parsedPerson = z.object({ displayName: reqText(80), theme: z.enum(THEME_KEYS) }).safeParse(formObject(fd));
+  const parsedWorld = z
+    .object({ relationshipName: reqText(60), startedOn: isoDate.optional() })
+    .safeParse(formObject(fd));
+  if (!parsedPerson.success) return { error: parsedPerson.error.issues[0]?.message ?? "Check your details" };
+  if (!parsedWorld.success) return { error: parsedWorld.error.issues[0]?.message ?? "Check your world details" };
+  const topics = chosenTopics(fd);
+  if (!topics.length) return { error: "Pick at least one interest." };
+
+  const db = await getDb();
+  const ip = clientIp(await headers());
+  if (!(await consumeAttempt(db, "ip", `signup:${ip}`, 10, 60 * 60_000))) {
+    return { error: "Too many sign-ups from this connection. Try again later." };
+  }
+
+  const profile = { providerAccountId: sub, email, emailVerified: true, displayName: suggestedName };
+  const created = await createGoogleAccount(db, {
+    profile,
+    displayName: parsedPerson.data.displayName,
+    theme: parsedPerson.data.theme,
+    worldName: parsedWorld.data.relationshipName,
+    startedOn: parsedWorld.data.startedOn ?? null,
+    topics,
+  });
+
+  if (!created.ok) {
+    // A parallel submission may have created the account while this form was open.
+    const existing = await resolveGoogleAccount(db, profile);
+    if (existing.ok && existing.kind === "existing") {
+      jar.delete(GOOGLE_SIGNUP_COOKIE);
+      await createSession({ personId: existing.personId, slug: existing.slug, version: existing.sessionVersion });
+      revalidatePath("/", "layout");
+      redirect("/");
+    }
+    return { error: created.error };
+  }
+
+  jar.delete(GOOGLE_SIGNUP_COOKIE);
+  await createSession({ personId: created.personId, slug: created.slug, version: created.sessionVersion });
+  revalidatePath("/", "layout");
+  redirect("/");
 }
 
 /** Joins an existing couple through a single-use, hashed invitation. */
@@ -139,7 +203,6 @@ export async function joinWorld(_: ActionState, fd: FormData): Promise<ActionSta
     throw error;
   }
 
-  await createSession({ personId: joined.id, slug: joined.slug, version: joined.sessionVersion });
-  revalidatePath("/", "layout");
+  await holdSession(joined.id, joined.slug, joined.sessionVersion);
   return { ok: true, recoveryCode };
 }

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getCtx } from "@/lib/context";
 import { BRAND } from "@lovora/domain";
+import { googleConfigured } from "@/lib/auth/google";
 import { pick, parseVerse, VERSE_COOKIE, VERSES } from "@/lib/journey/verses";
 import { Starfield } from "@/components/home/sky";
 import { RememberLines } from "@/components/home/remember";
@@ -11,9 +12,18 @@ import { LoginForm } from "./login-form";
 
 export const metadata = { title: `Sign in · ${BRAND.name}` };
 
+const NOTICES: Record<string, string> = {
+  "google-cancelled": "Google sign-in was cancelled. You can try again or use your email.",
+  "google-unavailable": "Google sign-in is not set up on this deployment yet. Use your email and password.",
+  "google-state": "That Google sign-in expired before it finished. Please try again.",
+  "google-failed": "Google sign-in could not be completed. Please try again.",
+  "google-linked": "That Google account cannot sign in here. Try another account or your password.",
+};
+
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   if (await getCtx()) redirect("/");
-  const { next } = await searchParams;
+  const { next, error } = await searchParams;
+  const notice = typeof error === "string" ? NOTICES[error] : undefined;
   const verse = pick(VERSES, (await cookies()).get(VERSE_COOKIE)?.value);
   let i = 0;
   return (
@@ -57,7 +67,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             </div>
           </div>
           <div className="fade-late lg:pl-2" style={{ "--d": "240ms" } as React.CSSProperties}>
-            <LoginForm next={typeof next === "string" ? next : "/"} />
+            <LoginForm next={typeof next === "string" ? next : "/"} notice={notice} googleEnabled={googleConfigured()} />
           </div>
         </div>
       </div>

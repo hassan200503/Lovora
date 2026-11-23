@@ -7,15 +7,16 @@ import { coupleMembers, couples, people, type Person } from "@/lib/db/schema";
 import { readSession } from "@/lib/auth/session";
 import { viewUrl } from "@/lib/media/storage";
 
-export type PublicPerson = Omit<Person, "passwordHash"> & {
+export type PublicPerson = Omit<Person, "passwordHash" | "recoveryHash" | "sessionVersion"> & {
   /** The couple-scoped member slug: what `/world/<slug>` and `?as=` mean. */
   slug: string;
   avatarUrl: string | null;
 };
 
 async function strip(p: Person, slug: string): Promise<PublicPerson> {
+  // Verifiers and the session-version counter stay on the server.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { passwordHash, ...rest } = p;
+  const { passwordHash, recoveryHash, sessionVersion, ...rest } = p;
   const avatarUrl = p.avatarPath ? await viewUrl(p.avatarPath).catch(() => null) : null;
   // `slug` here is the membership slug, which replaces the account handle on
   // everything the couple's world renders or links to.

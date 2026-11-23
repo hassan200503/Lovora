@@ -85,7 +85,7 @@ export default async function JoinPage({ params }: PageProps<"/join/[token]">) {
 
           {invite && !invite.full && (
             <div className="fade-late rounded-[28px] border border-white/10 bg-white/[0.045] p-5 shadow-[0_40px_100px_-40px_rgb(0_0_0/0.8)] backdrop-blur-2xl sm:p-8" style={{ "--d": "200ms" } as React.CSSProperties}>
-              <RecoveryForm action={joinWorld} submit={`Join ${invite.relationshipName}`} submitClass="btn-gold" className="space-y-7">
+              <RecoveryForm action={joinWorld} continueHref="/api/auth/continue" submit={`Join ${invite.relationshipName}`} submitClass="btn-gold" className="space-y-7">
                 <input type="hidden" name="token" value={token} />
                 <section className="space-y-4">
                   <p className="eyebrow-lux text-white/50">You</p>

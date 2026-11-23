@@ -45,7 +45,9 @@ Actors: two members of a couple; anonymous internet; abusive authenticated users
 | Cross-tenant write | Insert a message with another `couple_id` | `with check` policies; server sets `couple_id`; FK/composite tests | Service-role path mistakes |
 | Session theft | XSS or leaked refresh token | httpOnly/Secure cookies on web; Keychain/Keystore on native; CSP; short-lived access tokens; revocation | Device compromise; no MFA yet (Supabase supports it) |
 | Invite abuse | Spam/brute-force invite codes | Single-use, expiry, rate limits, unguessable tokens, audit | Social engineering of partner |
-| Account enumeration | Different errors for known emails | Uniform responses, throttling, OTP flow | Timing side channels |
+| Account enumeration | Different errors for known emails | Uniform responses, throttling, generic OTP request replies | Timing side channels |
+| Email/PIN brute force | Guessing a recovery code | 10-minute expiry, five attempts, per-IP and per-email buckets, single-use hashed codes | Compromised email inbox |
+| OAuth state/redirect abuse | Forged callback or open redirect | Signed state cookie, PKCE, exact redirect URI, same-origin-only `next`, server-side ID token verification | Misconfigured provider settings |
 | Hostile partner | Access after separation | Unlink/leave, block, deletion, session revocation; shared-data policy explicit | Past copies exported by the other member |
 | Upload abuse | CSAM, malware, oversized files | Hash matching, MIME/limits, quarantine, no public bucket, provider reporting | Novel content not in hash sets; legal process required |
 | TURN/call abuse | Relay used as free VPN | Per-call short TTL, rate limits, usage alerts, blocking | Cost spike before alert |
@@ -56,11 +58,15 @@ Actors: two members of a couple; anonymous internet; abusive authenticated users
 | Insider/support abuse | Staff reads private messages | Break-glass with reason + audit, no content by default, least privilege | Small team concentration |
 | Deletion failure | Data remains after "delete" | Purge queue with verification, alerts, evidence pack | Backups may retain until expiry; disclose |
 
-## Auth and session details (target)
+## Auth and session details
 
-- Supabase Auth for OTP/OAuth; access tokens short-lived; refresh rotation; project-level rate limits plus per-IP throttles.
-- Server verifies JWT and membership on every request; no trust in `couple_id` from the client.
-- Native tokens in secure hardware storage; logout revokes refresh tokens; "sign out everywhere" supported.
+- First-party email + password auth on Neon: bcrypt cost 12, case-insensitive email uniqueness, generic errors, dummy hash comparison for unknown accounts, and database-backed per-IP/per-email attempt buckets.
+- Sessions are HS256 JWTs in the httpOnly `lovora_session` cookie (30 days) with a `ver` claim matched to `people.sessionVersion`. Password change, email-code reset and "sign out everywhere" bump the version and revoke older tokens.
+- Email recovery: 6-digit codes expire in 10 minutes, allow five attempts, are single-use, and are stored only as an HMAC hash with a per-row salt. Sends/resends are limited to one per 60 seconds per address and capped per IP and per email in `auth_attempts`. Unknown addresses receive the same response and no email.
+- A verified code yields a 10-minute signed reset ticket bound to the account's session version; the conditional password update defeats replay. Reset rotates the recovery code and signs out other devices.
+- Signup, invitation acceptance and reset finish with a 10-minute signed continue ticket in an httpOnly cookie; `/api/auth/continue` exchanges it for the session (`ver` claim checked as usual). The session is deliberately not created while the one-time code screen is open, so a re-render cannot redirect away and hide the code.
+- Google sign-in uses OAuth 2.0 with PKCE and a signed state cookie. The ID token is verified server-side against Google's JWKS (issuer, audience, signature, `email_verified`). Accounts link by Google subject, then verified email. New Google users complete onboarding before an account exists; those accounts have no password until they set one.
+- Every auth route is server-side; no third-party JS is loaded for Google, and all forms post to our own origin (CSP `form-action 'self'`).
 - Email change requires verification of both old and new addresses; recovery is audited (E1-011).
 - MFA: not in v1 for consumers; consider TOTP/passkeys post-launch. Store the decision.
 
@@ -132,6 +138,6 @@ See `docs/RUNBOOK.md` for steps. Severity levels: SEV1 cross-tenant exposure/act
 
 ## Known gaps (today)
 
-- No RLS; custom auth without recovery/MFA/revocation; in-memory login throttle; global AI/TURN secrets; no moderation/report/block; no CSAM scanning; CSP/security headers implemented but not yet externally scanned; no observability; Vercel Hobby non-commercial.
+- No RLS; custom auth with signed sessions and recovery but no MFA; recovery depends on email deliverability (saved-code fallback remains); in-memory-only push/other feature state in places; global AI/TURN secrets; no moderation/report/block; no CSAM scanning; CSP/security headers implemented but not yet externally scanned; no observability; Vercel Hobby non-commercial.
 
 All are mapped to stories; none may remain open at public launch.

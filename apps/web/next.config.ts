@@ -1,12 +1,8 @@
-import path from "node:path";
 import type { NextConfig } from "next";
 import { securityHeaders } from "./src/lib/security/headers";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
-  // The web app lives inside a pnpm workspace; the lockfile and packages sit
-  // two levels up, so Turbopack must treat the repo root as its root.
-  turbopack: { root: path.resolve(process.cwd(), "../..") },
   transpilePackages: ["@lovora/domain", "@lovora/sync-protocol"],
   // PGlite ships WASM and data files that must be loaded from node_modules, not bundled;
   // web-push relies on Node's crypto and https modules, so it runs as-is from node_modules too.

@@ -18,6 +18,7 @@ import {
   check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import type { QueueEntry } from "@/lib/together/queue";
 
 /**
  * Data model for "Lovora".
@@ -86,6 +87,12 @@ export const people = pgTable(
      */
     email: text("email"),
     passwordHash: text("password_hash").notNull(),
+    /**
+     * False for accounts created through Google that have not chosen a password
+     * yet. Sign-in still works through the linked provider; the account can set
+     * a password later from Settings.
+     */
+    passwordSet: boolean("password_set").notNull().default(true),
     /** SHA-256 of a one-time recovery code. The code itself is never stored. */
     recoveryHash: text("recovery_hash"),
     /**
@@ -117,6 +124,64 @@ export const authAttempts = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [index("auth_attempts_reset").on(t.resetAt)],
+);
+
+/**
+ * External sign-in providers linked to a person. The provider's stable subject
+ * id is the key, not the email, so a changed address never breaks sign-in.
+ */
+export const authIdentities = pgTable(
+  "auth_identities",
+  {
+    id: id(),
+    personId: uuid("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
+    /** "google" today; the column is text so another provider is a value, not a migration. */
+    provider: text("provider").notNull(),
+    providerAccountId: text("provider_account_id").notNull(),
+    /** The address the provider reported when the link was made. */
+    email: text("email"),
+    emailVerified: boolean("email_verified").notNull().default(false),
+    createdAt: createdAt(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("auth_identities_provider_account").on(t.provider, t.providerAccountId),
+    uniqueIndex("auth_identities_person_provider").on(t.personId, t.provider),
+    index("auth_identities_person").on(t.personId),
+  ],
+);
+
+/**
+ * One-time codes for email account recovery. Only an HMAC of the code is
+ * stored, so a database leak is not enough to reset an account. Expiry and
+ * attempt counters live here too, which keeps the limits consistent across
+ * serverless instances.
+ */
+export const emailOtps = pgTable(
+  "email_otps",
+  {
+    id: id(),
+    /** Only recovery today; verification emails can reuse the same table. */
+    purpose: text("purpose").notNull().default("recovery"),
+    /** Lower-cased address the code was sent to. */
+    email: text("email").notNull(),
+    personId: uuid("person_id").references(() => people.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull(),
+    salt: text("salt").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    /** SHA-256 of the requesting connection, never the raw address. */
+    ipHash: text("ip_hash").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("email_otps_purpose_check", sql`${t.purpose} in ('recovery')`),
+    check("email_otps_attempts_check", sql`${t.attempts} >= 0`),
+    index("email_otps_email_created").on(t.email, t.purpose, t.createdAt),
+    index("email_otps_expiry").on(t.expiresAt),
+    index("email_otps_person").on(t.personId),
+  ],
 );
 
 export const couples = pgTable("couples", {
@@ -659,7 +724,10 @@ export const roomState = pgTable("room_state", {
   playing: boolean("playing").notNull().default(false),
   /** Seconds into the track at `updatedAt`. */
   position: real("position").notNull().default(0),
+  /** Legacy gallery-only queue, still mirrored for builds that predate `queueData`. */
   queue: uuid("queue").array().notNull().default(sql`'{}'::uuid[]`),
+  /** The ordered queue, including YouTube videos queued straight from search. */
+  queueData: jsonb("queue_data").$type<QueueEntry[]>().notNull().default(sql`'[]'::jsonb`),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: uuid("updated_by").references(() => people.id),
 });
@@ -953,4 +1021,60 @@ export const researchMessages = pgTable(
     index("research_messages_thread").on(t.threadId, t.id),
     foreignKey({ columns: [t.threadId, t.coupleId], foreignColumns: [researchThreads.id, researchThreads.coupleId] }).onDelete("cascade"),
   ],
+);
+
+// ─── Browser: Shorts ─────────────────────────────────────────────────────
+
+/** Metadata resolved once for a TikTok link a couple keeps in their Shorts feed. */
+export type ShortLinkMeta = { title: string; author: string; thumb: string | null; url: string };
+
+/**
+ * A like or save on one short-form video. Video keys are platform-qualified
+ * ("yt:<id>", "tt:<id>"), so the same row can point at a real TikTok or YouTube
+ * video without storing third-party content.
+ */
+export const shortReactions = pgTable(
+  "short_reactions",
+  {
+    personId: uuid("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
+    coupleId: uuid("couple_id").notNull().references(() => couples.id, { onDelete: "cascade" }),
+    videoKey: text("video_key").notNull(),
+    /** like | save */
+    kind: text("kind").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.personId, t.videoKey, t.kind] }), index("short_reactions_couple_video").on(t.coupleId, t.videoKey)],
+);
+
+/** A comment on a short-form video, visible only inside the couple. */
+export const shortComments = pgTable(
+  "short_comments",
+  {
+    id: id(),
+    coupleId: uuid("couple_id").notNull().references(() => couples.id, { onDelete: "cascade" }),
+    personId: uuid("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
+    videoKey: text("video_key").notNull(),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("short_comments_couple_video").on(t.coupleId, t.videoKey, t.createdAt), index("short_comments_person").on(t.personId)],
+);
+
+/**
+ * A TikTok link a couple added to their Shorts feed. Only the link and the
+ * oEmbed metadata are stored; playback always happens on TikTok's official
+ * player, never from a downloaded copy.
+ */
+export const shortLinks = pgTable(
+  "short_links",
+  {
+    id: id(),
+    coupleId: uuid("couple_id").notNull().references(() => couples.id, { onDelete: "cascade" }),
+    addedBy: uuid("added_by").notNull().references(() => people.id, { onDelete: "cascade" }),
+    videoKey: text("video_key").notNull(),
+    url: text("url").notNull(),
+    meta: jsonb("meta").$type<ShortLinkMeta>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("short_links_couple_video").on(t.coupleId, t.videoKey), index("short_links_couple_created").on(t.coupleId, t.createdAt)],
 );

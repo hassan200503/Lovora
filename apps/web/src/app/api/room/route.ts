@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   if (!ctx) return NextResponse.json({ error: "Sign in first" }, { status: 401 });
   const p = req.nextUrl.searchParams;
   try {
-    const payload = await readRoom(ctx, num(p.get("v")), num(p.get("after")), p.get("away") !== "1");
+    const payload = await readRoom(ctx, num(p.get("v")), num(p.get("after")));
     return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const denied = unavailable(error);
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   try {
     await applyRoom(ctx, parsed.data);
-    const payload = await readRoom(ctx, null, num(req.nextUrl.searchParams.get("after")), req.nextUrl.searchParams.get("away") !== "1");
+    const payload = await readRoom(ctx, null, num(req.nextUrl.searchParams.get("after")));
     return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const denied = unavailable(error);

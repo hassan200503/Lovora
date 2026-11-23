@@ -4,7 +4,7 @@ import { and, eq, max } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { THEME_KEYS } from "@lovora/domain";
-import { changePassword as applyPasswordChange, newRecoveryCode, revokeOtherSessions, rotateRecovery } from "@/lib/auth/accounts";
+import { changePassword as applyPasswordChange, newRecoveryCode, revokeOtherSessions, rotateRecovery, setPassword as applySetPassword } from "@/lib/auth/accounts";
 import { createInvitation, revokeInvitations } from "@/lib/auth/invite";
 import { createSession } from "@/lib/auth/session";
 import { getDb } from "@/lib/db/client";
@@ -322,6 +322,19 @@ export async function changePassword(_: ActionState, fd: FormData): Promise<Acti
   await createSession({ personId, slug, version: result.sessionVersion });
   revalidatePath("/", "layout");
   return { ok: true, message: "Password changed. Other devices were signed out." };
+}
+
+/** Adds a first password to an account created through Google. */
+export async function setPassword(_: ActionState, fd: FormData): Promise<ActionState> {
+  const { db, personId, slug } = await me();
+  const next = String(fd.get("next") ?? "");
+  const confirm = String(fd.get("confirm") ?? "");
+  if (next !== confirm) return { error: "The passwords don't match" };
+  const result = await applySetPassword(db, personId, next);
+  if (!result.ok) return { error: result.error };
+  await createSession({ personId, slug, version: result.sessionVersion });
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Password set. You can now sign in with it too." };
 }
 
 /** Issues a replacement recovery code, shown once. The old code stops working immediately. */

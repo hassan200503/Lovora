@@ -15,7 +15,6 @@ import { QuestionCard } from "@/components/home/question-card";
 import { JourneyClock } from "@/components/home/journey-clock";
 import { RememberLines } from "@/components/home/remember";
 import { Starfield } from "@/components/home/sky";
-import { LoveStoriesTrailer } from "@/components/home/love-stories";
 import { Avatar } from "@/components/avatar";
 import { IconArrowRight, IconCompass, IconFlask, IconHeart, IconImage, IconMapPin, IconMessage, IconSparkle, IconStar, Monogram } from "@/components/icons";
 import { personTopics, todaysDiscovery, type TrendCard } from "@/lib/trends/query";
@@ -70,11 +69,11 @@ function Milestone({ label, value, unit, detail, progress, world, href }: { labe
     </>
   );
   return href ? (
-    <Link href={href} className="tile lift block p-6 sm:p-7">
+    <Link href={href} className="home-milestone tile lift block p-6 sm:p-7">
       {body}
     </Link>
   ) : (
-    <div className="tile p-6 sm:p-7">{body}</div>
+    <div className="home-milestone tile p-6 sm:p-7">{body}</div>
   );
 }
 
@@ -211,11 +210,11 @@ export default async function Home() {
   const sinceLast = t ? 365 - t.daysToAnniversary : 0;
 
   return (
-    <div className="pb-6">
+    <div className="home-page pb-6">
       <RememberLines cookies={{ [VERSE_COOKIE]: verse.remember, [VOW_COOKIE]: vow.remember }} />
 
       {/* ── THE STAGE ─────────────────────────────────────────────── */}
-      <section className="px-2.5 pt-2.5 sm:px-4 sm:pt-4">
+      <section className="home-hero px-2.5 pt-2.5 sm:px-4 sm:pt-4">
         <div className="stage mx-auto max-w-[1400px] rounded-[28px] sm:rounded-[36px]">
           <div className="aurora" aria-hidden>
             <span />
@@ -224,7 +223,7 @@ export default async function Home() {
           </div>
           <Starfield />
           <div className="relative z-[3] mx-auto max-w-6xl px-5 sm:px-10">
-            <div className="flex items-center justify-between gap-4 pt-7 sm:pt-9">
+            <div className="flex items-center justify-between gap-4 pt-5 sm:pt-7">
               <p className="eyebrow-lux fade-late whitespace-nowrap" style={{ "--d": "0ms" } as React.CSSProperties}>
                 <span className="max-sm:hidden">{BRAND.name}{t ? " · " : ""}</span>
                 {t ? `Chapter ${roman(chapter)}` : <span className="sm:hidden">{BRAND.name}</span>}
@@ -236,42 +235,37 @@ export default async function Home() {
               )}
             </div>
 
-            <div className="grid items-center gap-6 pb-10 pt-12 sm:pt-16 lg:grid-cols-[1.35fr_1fr] lg:gap-10 lg:pb-16 lg:pt-14">
-              <div className="relative z-10">
-                <Verse text={verse.text} />
-                <div className="fade-late mt-9 flex items-center gap-4" style={{ "--d": "1100ms" } as React.CSSProperties}>
-                  <span className="rule-gold w-14" aria-hidden />
-                  <p className="text-[0.72rem] uppercase tracking-[0.3em] text-white/60">
-                    {names}
-                    {ctx.relationship.startedOn && <span className="hidden sm:inline"> · since {fullDate(ctx.relationship.startedOn)}</span>}
-                  </p>
-                </div>
-                <div className="fade-late mt-10 flex flex-wrap items-center gap-3" style={{ "--d": "1300ms" } as React.CSSProperties}>
-                  <Link href="/story#add" className="btn-gold">
-                    <IconHeart size={17} /> Write today&apos;s page
-                  </Link>
-                  {partner && (
-                    <Link href="/together/chat" className="btn-glass">
-                      <IconMessage size={17} /> Message {firstOf(partner)}
-                      {unread.unread > 0 && <span className="grid min-w-5 place-items-center rounded-full bg-emerald-500 px-1.5 text-[0.65rem] font-bold leading-5 text-white">{unread.unread}</span>}
-                    </Link>
-                  )}
-                  {!partner && (
-                    <Link href="/settings#invite" className="btn-glass">
-                      <IconHeart size={17} /> Invite your partner
-                    </Link>
-                  )}
-                  <Link href="/story" className="group ml-1 inline-flex items-center gap-1.5 px-2 py-2 text-sm text-white/70 transition hover:text-white">
-                    Our story <IconArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
-                  </Link>
-                </div>
+            <div className="mx-auto flex max-w-3xl flex-col items-center pb-8 pt-10 text-center sm:pb-12 sm:pt-14 lg:pt-16">
+              <Verse text={verse.text} />
+              <div className="fade-late mt-6 flex items-center justify-center gap-4" style={{ "--d": "1100ms" } as React.CSSProperties}>
+                <span className="rule-gold w-14" aria-hidden />
+                <p className="text-[0.72rem] uppercase tracking-[0.3em] text-white/60">
+                  {names}
+                  {ctx.relationship.startedOn && <span className="hidden sm:inline"> · since {fullDate(ctx.relationship.startedOn)}</span>}
+                </p>
               </div>
-              <div className="fade-late relative mx-auto w-full max-w-[26rem] lg:z-10 lg:max-w-none" style={{ "--d": "400ms" } as React.CSSProperties}>
-                <LoveStoriesTrailer />
+              <div className="fade-late mt-7 flex flex-wrap items-center justify-center gap-3" style={{ "--d": "1300ms" } as React.CSSProperties}>
+                <Link href="/story#add" className="btn-gold">
+                  <IconHeart size={17} /> Write today&apos;s page
+                </Link>
+                {partner && (
+                  <Link href="/together/chat" className="btn-glass">
+                    <IconMessage size={17} /> Message {firstOf(partner)}
+                    {unread.unread > 0 && <span className="grid min-w-5 place-items-center rounded-full bg-emerald-500 px-1.5 text-[0.65rem] font-bold leading-5 text-white">{unread.unread}</span>}
+                  </Link>
+                )}
+                {!partner && (
+                  <Link href="/settings#invite" className="btn-glass">
+                    <IconHeart size={17} /> Invite your partner
+                  </Link>
+                )}
+                <Link href="/story" className="group inline-flex items-center gap-1.5 px-2 py-2 text-sm text-white/70 transition hover:text-white">
+                  Our story <IconArrowRight size={15} className="transition-transform group-hover:translate-x-0.5" />
+                </Link>
               </div>
             </div>
 
-            <div className="border-t border-white/10 py-8 sm:py-10">
+            <div className="border-t border-white/10 py-6 sm:py-8">
               {ctx.relationship.startedOn && t ? (
                 <div className="fade-late" style={{ "--d": "1500ms" } as React.CSSProperties}>
                   <p className="mb-6 text-center text-[0.66rem] uppercase tracking-[0.34em] text-white/45">Walking this road together for</p>
@@ -288,9 +282,9 @@ export default async function Home() {
       </section>
 
       {/* ── THE ROAD AHEAD ────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-4 pt-16 sm:pt-24">
+      <section className="mx-auto max-w-6xl px-4 pt-12 sm:pt-16">
         <SectionHead eyebrow="The road ahead" title="What we're walking toward" />
-        <div className="mt-9 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="home-milestone-grid mt-7 grid gap-4">
           {meetIn !== null ? (
             <Milestone
               label="Together again"
@@ -328,7 +322,7 @@ export default async function Home() {
       </section>
 
       {/* ── RIGHT NOW ─────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl space-y-4 px-4 pt-10">
+      <section className="mx-auto max-w-6xl space-y-4 px-4 pt-8">
         {birthdayToday && (
           <div data-world={birthdayToday.m.theme} className="stage rise relative overflow-hidden rounded-[28px] px-6 py-10 text-center">
             <Starfield count={60} />
@@ -346,7 +340,7 @@ export default async function Home() {
       </section>
 
       {/* ── A MOMENT FROM THE JOURNEY ─────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-4 pt-16 sm:pt-24">
+      <section className="mx-auto max-w-6xl px-4 pt-12 sm:pt-16">
         <SectionHead
           eyebrow={todayMemory ? "On this day" : "From our journey"}
           title={todayMemory ? `${yearsAgo} year${yearsAgo === 1 ? "" : "s"} ago today` : "Every step, remembered"}
@@ -460,9 +454,9 @@ export default async function Home() {
       </section>
 
       {/* ── TWO WORLDS ────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-4 pt-16 sm:pt-24">
+      <section className="mx-auto max-w-6xl px-4 pt-12 sm:pt-16">
         <SectionHead eyebrow="Two worlds, one orbit" title="Where each of us grows" />
-        <div className="mt-9 grid gap-4 md:grid-cols-2">
+        <div className="mt-7 grid gap-4 md:grid-cols-2">
           {members.map((m) => (
             <WorldCard key={m.id} person={m} topics={topicsBy.get(m.id) ?? []} />
           ))}
@@ -470,10 +464,10 @@ export default async function Home() {
       </section>
 
       {/* ── DISCOVERED TODAY ──────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-4 pt-16 sm:pt-24">
+      <section className="mx-auto max-w-6xl px-4 pt-12 sm:pt-16">
         <SectionHead eyebrow="Our shared world" title="Discovered today" />
         <p className="mt-3 max-w-2xl text-muted">Chosen each morning from what real sources published in the last few days. The same all day; something new tomorrow.</p>
-        <div className="mt-9 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="mt-7 grid grid-cols-1 gap-5 md:grid-cols-3">
           <Today title={`${firstOf(ctx.me)} · ${mainTopic(ctx.me.id) ? TOPICS[mainTopic(ctx.me.id)!].label : "Discovery"}`} item={mine} world={ctx.me.theme} />
           {partner && <Today title={`${firstOf(partner)} · ${mainTopic(partner.id) ? TOPICS[mainTopic(partner.id)!].label : "Discovery"}`} item={theirs} world={partner.theme} />}
           <Today title="For both of you" item={shared} world="us" />
@@ -502,7 +496,7 @@ export default async function Home() {
       </section>
 
       {/* ── CURIOUS TOGETHER ───────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-4 pt-16 sm:pt-24">
+      <section className="mx-auto max-w-6xl px-4 pt-12 sm:pt-16">
         <div className="tile relative overflow-hidden p-6 sm:p-10">
           <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-gold-soft blur-3xl" aria-hidden />
           <div className="relative grid gap-8 lg:grid-cols-[1fr_1.1fr] lg:items-end">
@@ -526,7 +520,7 @@ export default async function Home() {
       </section>
 
       {/* ── CLOSE ─────────────────────────────────────────────────── */}
-      <footer className="mx-auto max-w-6xl px-4 pb-10 pt-24 text-center">
+      <footer className="mx-auto max-w-6xl px-4 pb-10 pt-16 text-center">
         <Monogram size={44} className="mx-auto" />
         <p className="font-lux mx-auto mt-6 max-w-xl text-[2rem] italic leading-tight sm:text-[2.4rem]">
           <span className="gold-deep">{vow.text}</span>

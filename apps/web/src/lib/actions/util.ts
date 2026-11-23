@@ -1,7 +1,21 @@
 import "server-only";
 import { z } from "zod";
 
-export type ActionState = { ok?: boolean; error?: string; message?: string; recoveryCode?: string; invitePath?: string } | null;
+export type RecoveryStep = "request" | "code" | "password" | "done";
+
+export type ActionState = {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  recoveryCode?: string;
+  invitePath?: string;
+  /** Recovery flow progress, consumed by the client component. */
+  step?: RecoveryStep;
+  email?: string;
+  cooldownSeconds?: number;
+  /** Changes on every accepted code request so the resend countdown can restart. */
+  cooldownKey?: number;
+} | null;
 
 /** Reads a FormData into a plain object, turning "" into undefined. */
 export function formObject(fd: FormData): Record<string, string | undefined> {

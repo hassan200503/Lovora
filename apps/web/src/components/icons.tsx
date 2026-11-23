@@ -117,6 +117,12 @@ export const IconSpeaker = (p: P) => (
     <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" />
   </Svg>
 );
+export const IconSpeakerOff = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
+    <path d="m16 9.5 5 5M21 9.5l-5 5" />
+  </Svg>
+);
 export const IconReply = (p: P) => (
   <Svg {...p}>
     <path d="M9.5 6 4 11.5 9.5 17" />
@@ -336,6 +342,12 @@ export const IconSpinner = ({ className = "", size = 18 }: { className?: string;
     <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
   </svg>
 );
+export const IconRefresh = (p: P) => (
+  <Svg {...p}>
+    <path d="M20 12a8 8 0 1 1-2.35-5.65" />
+    <path d="M20 4.5V9h-4.5" />
+  </Svg>
+);
 export const IconArrowRight = (p: P) => (
   <Svg {...p}>
     <path d="M4.5 12h15M13.5 6l6 6-6 6" />
@@ -354,6 +366,16 @@ export const IconSend = (p: P) => (
 export const IconMinimize = (p: P) => (
   <Svg {...p}>
     <path d="M9.5 4.5v5h-5M14.5 19.5v-5h5M4.5 4.5l5 5M19.5 19.5l-5-5" />
+  </Svg>
+);
+export const IconExpand = (p: P) => (
+  <Svg {...p}>
+    <path d="M9.5 14.5v5h-5M14.5 9.5v-5h5M14.5 9.5l-5-5M9.5 14.5l5 5" />
+  </Svg>
+);
+export const IconFullscreen = (p: P) => (
+  <Svg {...p}>
+    <path d="M4.5 9V4.5H9M15 4.5h4.5V9M19.5 15v4.5H15M9 19.5H4.5V15" />
   </Svg>
 );
 export const IconBell = (p: P) => (

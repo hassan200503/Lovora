@@ -6,7 +6,7 @@ import { EDIT_WINDOW_MS, MAX_VOICE_MS, QUICK_REACTIONS, type ChatMessage, type C
 import { uploadChatPhoto, uploadVoiceNote } from "@/lib/media/client-upload";
 import { Avatar } from "@/components/avatar";
 import { useCall } from "@/components/call/call-provider";
-import { IconArrowDown, IconChevronLeft, IconCopy, IconImage, IconMic, IconPencil, IconPhone, IconReply, IconSend, IconTrash, IconVideo, IconX } from "@/components/icons";
+import { IconArrowDown, IconChevronLeft, IconChevronRight, IconCopy, IconImage, IconMic, IconPencil, IconPhone, IconReply, IconSend, IconTrash, IconVideo, IconX } from "@/components/icons";
 import { useMe, useMembers } from "@/components/me-context";
 import { PushPrompt } from "@/components/push";
 import { Bubble, Quote, type Tick } from "./bubble";
@@ -128,7 +128,18 @@ function DeleteDialog({ canEveryone, onChoose, onClose }: { canEveryone: boolean
  * swipe (or hold) to reply, reactions, edit, delete for me or for everyone,
  * and voice and video calls from the header.
  */
-export function ChatView({ variant = "page" }: { variant?: "page" | "panel" }) {
+export function ChatView({
+  variant = "page",
+  onCollapse,
+  callMinimized = false,
+  keyboardAware = false,
+}: {
+  variant?: "page" | "panel";
+  onCollapse?: () => void;
+  callMinimized?: boolean;
+  /** For a panel inside a phone overlay: lift it above the on-screen keyboard. */
+  keyboardAware?: boolean;
+}) {
   const me = useMe();
   const members = useMembers();
   const partnerP = members.find((m) => m.id !== me.id);
@@ -224,9 +235,12 @@ export function ChatView({ variant = "page" }: { variant?: "page" | "panel" }) {
 
   // Phones: keep the composer above the on-screen keyboard.
   useEffect(() => {
-    if (variant !== "page" || !window.visualViewport || window.innerWidth >= 640) return;
+    if (!(variant === "page" || keyboardAware) || !window.visualViewport || window.innerWidth >= 640) return;
     const v = window.visualViewport;
-    const fit = () => setVv({ h: v.height, top: v.offsetTop });
+    const fit = () => {
+      const open = v.height < window.innerHeight - 120;
+      setVv(variant === "page" || open ? { h: v.height, top: v.offsetTop } : null);
+    };
     fit();
     v.addEventListener("resize", fit);
     v.addEventListener("scroll", fit);
@@ -234,7 +248,7 @@ export function ChatView({ variant = "page" }: { variant?: "page" | "panel" }) {
       v.removeEventListener("resize", fit);
       v.removeEventListener("scroll", fit);
     };
-  }, [variant]);
+  }, [variant, keyboardAware]);
 
   const scrollToBottom = useCallback((smooth: boolean) => {
     const el = scroller.current;
@@ -398,7 +412,7 @@ export function ChatView({ variant = "page" }: { variant?: "page" | "panel" }) {
   const startCall = (kind: "audio" | "video") => {
     if (!call) return;
     if (inCall) return call.setMinimized(false);
-    call.start(kind);
+    call.start(kind, { minimize: callMinimized });
   };
 
   // Build the rows: day separators, the unread divider, then each message.
@@ -457,7 +471,7 @@ export function ChatView({ variant = "page" }: { variant?: "page" | "panel" }) {
     : "flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-line bg-bg";
 
   return (
-    <section className={shell} style={page && vv ? { height: vv.h, transform: `translateY(${vv.top}px)` } : undefined} aria-label={`Chat with ${first}`}>
+    <section className={shell} style={(page || keyboardAware) && vv ? { height: vv.h, transform: `translateY(${vv.top}px)` } : undefined} aria-label={`Chat with ${first}`}>
       {/* Header */}
       <header className="glass relative z-20 flex items-center gap-3 border-b border-line px-2 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-4 sm:pt-2">
         {page && (
@@ -478,6 +492,11 @@ export function ChatView({ variant = "page" }: { variant?: "page" | "panel" }) {
         <button type="button" onClick={() => startCall("audio")} className="grid size-10 place-items-center rounded-full text-ink transition hover:bg-surface-2 disabled:opacity-40" aria-label={`Voice call ${first}`} title="Voice call" disabled={!call}>
           <IconPhone size={20} />
         </button>
+        {onCollapse && (
+          <button type="button" onClick={onCollapse} className="grid size-10 place-items-center rounded-full text-muted transition hover:bg-surface-2 hover:text-ink" aria-label="Hide chat" title="Hide chat">
+            <IconChevronRight size={20} />
+          </button>
+        )}
       </header>
 
       {page && <PushPrompt partnerName={first} />}
