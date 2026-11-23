@@ -1,125 +1,185 @@
-# Lovora
+﻿# Lovora
 
-A private shared world for two: messages, encrypted calls, synchronised listening and watching, memories, and live discoveries from the real world. Web today, one shared TypeScript codebase, and a tested sync protocol underneath the room.
+> A private, web-based shared world for exactly two people.
 
-Requires Node.js 24+ and pnpm 12.21.0 (`corepack enable pnpm` once, or use any Node version manager). No database setup is needed.
+[![CI](https://github.com/hassan200503/Lovora/actions/workflows/ci.yml/badge.svg)](https://github.com/hassan200503/Lovora/actions/workflows/ci.yml)
+[![Node.js 24+](https://img.shields.io/badge/node-%3E%3D24-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![pnpm 12.21.0](https://img.shields.io/badge/pnpm-12.21.0-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
 
-```
-                  LOVORA
-                      │
-        ┌─────────────┼─────────────┐
-     YOU           OUR STORY      PARTNER
-   software        memories      nature
-   technology      plans         writing
-   philosophy      milestones    making
-   nature          discoveries   environment
-        └─────────────┼─────────────┘
-               SHARED DISCOVERY
-            LIVE REAL-WORLD TRENDS
-```
+**[Open the production app](https://lovora-app.vercel.app/)** · **[Report an issue](https://github.com/hassan200503/Lovora/issues)** · **[Deployment guide](DEPLOY.md)**
 
-## What's inside
+Lovora brings the parts of a couple's shared life that usually end up in separate apps into one private space: real-time messaging, encrypted calls, synchronized rooms, media, memories, rituals, personalized discovery, and research. It is an 18+ product designed for two members per world; it is not a social network, dating service, or group workspace.
 
-| Area | Where |
+## Production screenshots
+
+The screenshots below were captured from the deployed production URL on 23 November 2026. They are checked-in repository assets, not mockups.
+
+| Public landing page | Sign-in page |
 | --- | --- |
-| Home: the night stage with a journey verse that changes on every visit, a live journey clock, the road ahead, a moment from your journey | `/` |
-| Messages: typing indicator, sent / delivered / read ticks, swipe or hold to reply, photos, voice notes with waveforms, reactions, edit, delete for me or for everyone | `/together/chat` |
-| Voice and video calls, from Messages, the partner menu in the header, or the home page | anywhere |
-| Together room: listen and watch in sync, with the chat beside you; it keeps playing (as a mini-player) through Messages, calls and the rest of the site | `/together` |
-| Our Story: memories, milestones, adventures, plans, saved discoveries | `/story` |
-| Each person's world: profile, dashboard, journal, radar, skills, Knowledge Vault | `/world/[slug]` |
-| Per-person projects and thinking journal | `/world/[slug]/projects`, `/world/[slug]/thinking` |
-| For You (interleaves every followed topic; favourite topics get double space) | `/discover` |
-| Topic feeds with category filters: software, technology, philosophy, nature, biotech, birds, knitting, environment | `/discover/[topic]` |
-| Something We Both Might Like: items touching both a technology and a life-science thread | `/discover/together` |
-| Things We Are Learning (shared) | `/learning` |
-| Research: real studies read and cited, step-by-step lessons with a quiz, or the simple version; share threads with each other | `/research` |
-| Weekly digest (any past week) | `/digest` |
-| Global search | `/search` |
-| Personalisation: interests, favourite topics, muted/starred sources, hidden categories and keywords | `/settings` |
-| Opt-in public profile (public skills and projects only, at an opaque link) | `/p/[handle]` |
-| Source health | `/discover/sources` |
+| ![Lovora production landing page](docs/screenshots/production-home.png) | ![Lovora production sign-in page](docs/screenshots/production-login.png) |
 
-### Start fresh or use demo data
+## Core features
 
-To begin with your own world, run `pnpm reset`, start `pnpm dev`, and open `/welcome`. The first person creates their account with an email and password, picks interests and gets a single-use invitation link (7 days) for their partner. No demo accounts are created.
+| Feature | What it provides |
+| --- | --- |
+| Private world for two | A couple-scoped data model with up to two active members, invitation-based pairing, first-party accounts, recovery codes, and session invalidation. |
+| Realtime chats | Messages use durable writes plus short-interval synchronization for typing state, delivery/read receipts, replies, reactions, edits, delete-for-me, and delete-for-everyone. Photos and voice notes are supported. |
+| Encrypted calls | 1:1 WebRTC voice and video calls send media directly between browsers using encrypted WebRTC transport. The service supplies signaling, ICE restart, optional TURN configuration, ringing, and web-push call alerts. |
+| Together room | Shared listening and watching with a queue, room chat, persistent mini-player, server-versioned state, clock estimation, and drift correction. |
+| Shared gallery | Couple-scoped photo, video, and audio storage with signed reads, media validation, image processing, and comments. It also supports optional live YouTube search and shelves for adding items to the shared gallery. |
+| Built-in discovery browser | A reading-oriented browser inside Lovora for current discoveries. It presents curated source cards, filters, saved items, source health, detailed views, and outbound attribution links. |
+| Personalized feeds | Each person follows interests and can favorite topics, mute or star sources, and hide categories or keywords. The combined feed deliberately interleaves followed topics and gives favorites additional prominence. RSS/Atom blogs, publishers, institutional sources, and iNaturalist are normalized into one feed. |
+| AI research | Research combines OpenAlex study search with optional Gemini assistance. It supports cited study answers, simple explanations, structured lessons, quizzes, follow-up threads, sharing with a partner, and saving material to shared learning. |
+| Shared story and rituals | Memories, milestones, adventures, plans, discoveries, a daily question, a weekly digest, and a shared learning list make the space useful beyond chat. |
+| Personal space | Per-person profiles, dashboards, journals, projects, skills, radar, and a knowledge vault use explicit private/shared/public visibility. |
 
-`pnpm run setup` instead creates a generic demo couple, **Alex** and **Sam**, with a few interests, skills and projects. Change names and profiles in Settings; `pnpm reset` clears the local world; the generated demo sign-in details are in `apps/web/.env.local` (git-ignored).
+## Product boundaries
 
-### Privacy
+Lovora is intentionally constrained so its privacy and operating model remain clear.
 
-Everything personal has a visibility: 🔒 **private** (owner only), 💞 **shared** (the two of you), or 🌍 **public** (only on an enabled public profile). Vault and thinking-journal entries default to private. The rule is implemented once, in `visibleTo()` (`apps/web/src/lib/context.ts`), and every read goes through it.
+- A world is limited to two people.
+- There is no public feed, follower graph, advertising, or data-selling model.
+- Public profiles are opt-in and expose only permitted public fields.
+- Billing, licensed catalogue playback, screen sharing, replacement room transport, and public commons are feature-flagged **off** by default.
+- The application is a responsive web/PWA product. A native mobile shell is not included in this repository.
 
-## Messages and calls
+## Architecture
 
-- **Messages** live in their own table (`messages`), so replies, reactions, edits and "delete for everyone" keep their place in the conversation. Clients poll `/api/chat?since=…` every 1.5 s while you're both online (4 s otherwise, paused in the background). Each send carries an id made on the device, so a retry is stored once.
-- **Typing and receipts** come from `chat_state`: `typing_until` for the dots, `last_delivered_id` (set when a partner's device fetches) and `last_read_id` (set while the chat is on screen) for ✓, ✓✓ and blue ✓✓.
-- **Photos and voice notes** reuse the couple's media pipeline, so they get the same quota, signed reads and cleanup as the gallery, but `media.origin = "chat"` keeps them out of the gallery. Photos are re-encoded to WebP with a thumbnail. A voice note is recorded with a live level meter (up to five minutes), stored with its duration and 48 waveform peaks, and plays inline with seek, 1×/1.5×/2× and only one note at a time. Deleting a message for everyone removes the stored object too; deleting for me leaves it for your partner.
-- **Calls** are peer-to-peer WebRTC: audio and video go directly between the two browsers, encrypted end to end. The server only relays the handshake (`calls`, `call_signals`) through `/api/call`. Every call negotiates both audio and video, so turning the camera on mid-call is instant; a data channel carries mute, camera and hang-up; the caller restarts ICE when a network changes. Calls ring anywhere on the site within a few seconds (the pulse checks in every 3 s while your partner is online), and each call leaves a line in the chat.
-- **Alerts like a phone's messenger** use Web Push (`public/sw.js`): calls ring (and keep ringing every few seconds until answered, declined or missed) and messages pop up, even when the site is closed or nobody is signed in on that device. After signing in on a new device, a "Stay within reach" sheet asks to turn them on (on iPhone it shows the Add to Home Screen steps first); Settings → Calls & alerts and a banner in Messages do the same. Subscriptions refresh on every visit and survive signing out. "Decline" on a call notification carries a signed token, so it works on a signed-out device; "Answer" opens the call (through sign-in if needed). The app icon shows the unread count. VAPID keys are derived from the session secret, so there is nothing to configure.
-
-## Research
-
-- **Ask anything** at `/research` in one of three modes: *Research studies* (finds papers in [OpenAlex](https://openalex.org), a free index of 250M+ scholarly works, and has Gemini synthesise them with numbered citations that open each study), *Learn it* (a step-by-step lesson ending in a self-check) and *Explain simply*. Answers stream in as they're written, with three follow-up questions to go further.
-- **Threads** keep the conversation, so follow-ups have context. Share a thread and it appears in your partner's Research too; they can read it and ask follow-ups. **Quiz me** writes five multiple-choice questions on what a thread covered. **Save to learning** keeps an answer in Things We Are Learning.
-- **Gemini** (`apps/web/src/lib/research/gemini.ts`) tries each model in `GEMINI_MODELS` until one answers, first with Google Search grounding, then without; a model that says "busy" waits at the back of the queue for a minute. When grounding is used, Google's search suggestions are shown with the answer, as Google requires.
-- **Keys** come from `GEMINI_API_KEY`, or from Settings → AI research, where the key is checked with Google and stored sealed (AES-256-GCM) in the `kv` table (`apps/web/src/lib/settings.ts`). The call relay in Settings → Call relay is stored the same way. Neither ever reaches the browser.
-
-## Listening together
-
-- **One player for the whole site.** The room's player lives in the root layout (`apps/web/src/components/together/room-provider.tsx`), so opening Messages, taking a call or visiting any page never stops the music: outside the room it becomes a mini-player (play/pause for both, back to the room, stop on this device). During a call the music drops to 20% volume.
-- **Staying in step.** The server keeps `{playing, position, updatedAt}`; play/pause/seek carry the moment they happened, so request travel time doesn't put anyone behind. Each device estimates the server clock from its fastest recent round trips, never lets an older reply undo a newer state, and closes gaps by playing up to 5–10% faster or slower. It jumps only for large gaps, never while buffering, only into audio already downloaded (unless far behind), and backs off on slow connections. "Ended" names the state version it judged, so a stale report can't stop a track that was just restarted.
-- **Measured, not asserted.** Those rules live in `packages/sync-protocol` — pure TypeScript with no React, clock or random source — together with a deterministic simulator that runs two skewed clients over latency, jitter, packet loss and buffering stalls in virtual time. Seed 7 of the default 95-second scenario measures **p95 drift of 295 ms on wifi, 280 ms on mobile and 326 ms on poor networks**, and 286 ms with 33% packet loss, against a 500 ms target. The same rules drive the room provider, so what CI measures is what ships.
-
-## The Live Trends Engine
-
-```
-Source registry (sources.ts) → adapter (RSS/Atom, iNaturalist) → normalise
-→ quality filter → deduplicate (normalised URL) → categorise + tag (topics.ts)
-→ Postgres → keyset-paginated API (/api/trends) → React Query infinite feed
+```mermaid
+flowchart LR
+  Browser[Next.js web client / PWA] --> App[Next.js server routes and actions]
+  Browser <-->|WebRTC media| Partner[Partner browser]
+  Browser <-->|chat, room state, push| App
+  App --> DB[(Postgres / Neon)]
+  App --> Blob[Signed media storage]
+  App --> Sources[RSS, Atom and iNaturalist]
+  App --> OpenAlex[OpenAlex]
+  App -. optional .-> Gemini[Gemini API]
+  Scheduler[GitHub Actions / cron] --> Sources
+  Scheduler --> App
 ```
 
-- **Real data only.** 39 sources were checked on 2026-09-27 to be current. An item without a date is dropped rather than shown with a guessed freshness. Items older than a year are skipped, and future timestamps are clamped to now.
-- **Honest freshness.** A feed shows **Live** only if its sources publish through the day, were checked in the last 2 hours, and delivered something in the last 24 hours. Otherwise it shows "Sources update daily" and when they were last checked. Cards show relative and absolute publish dates, with the retrieval date on hover and on the detail page.
-- **Never on page load.** Pages read only from the database. The scheduled job fetches, and if it stalls, the next visitor's request schedules a short background refresh (`after()`) for sources that are due. Visitors never wait on external APIs.
-- **Failure handling.** Sources are claimed atomically, so overlapping runs never double-fetch. Failures back off exponentially (capped at a day) and honour `Retry-After`. The UI shows *"Some discoveries are temporarily unavailable. Your saved content is still here."* with cached content still in place.
-- **Attribution and licensing.** We store a title, a ≤280-character excerpt, metadata and a link, never the full article. Images appear only where reuse is clearly allowed: NASA (public domain) and iNaturalist photos under CC licences, each with its credit and licence shown. Every other card uses the topic's own artwork.
-- **Quality.** Sources are tiered (official organisations → universities → research institutions → journals → …), and a filter drops coupon, deal and gift-guide posts.
-- **Adding a source:** append one line to `apps/web/src/lib/trends/sources.ts`. **Changing categories:** edit `apps/web/src/lib/trends/topics.ts`, then run `pnpm retag` to re-apply the rules to stored items.
+### Repository layout
 
-## Run it locally
+```text
+apps/web/                 Next.js 16 application, API routes, UI, migrations, scripts
+packages/domain/          Framework-independent product and brand types
+packages/sync-protocol/   Deterministic room-sync protocol and simulator
+packages/ui-tokens/       Shared design tokens
+docs/                     Product, architecture, privacy, security, and runbook docs
+security/                 Dependency-audit policy
+```
+
+### Implementation notes
+
+- **Frontend:** Next.js 16 App Router, React 19, React Server Components, server actions, and TanStack Query.
+- **Data:** Drizzle ORM over PostgreSQL. Local development and tests use embedded PGlite; production accepts a PostgreSQL connection such as Neon.
+- **Realtime design:** chat and room state use polling with server-assigned versions; WebRTC carries call media; Web Push delivers alerts. No shared socket server is required.
+- **Room synchronization:** the protocol is framework-free TypeScript with deterministic virtual-time tests for clock skew, latency, jitter, packet loss, and buffering.
+- **Discovery pipeline:** source registry → RSS/Atom or iNaturalist adapters → normalization → quality filtering → URL de-duplication → topic tagging → PostgreSQL → keyset-paginated API → React Query feed.
+- **Media:** couple-scoped paths, signed URLs, server-side MIME and size validation, EXIF stripping, and no DRM circumvention or downloaded streamed media.
+- **Tenant isolation:** couple ownership is derived from the verified session. Personal visibility resolves through one access gate, and the test suite includes a cross-couple tenancy matrix.
+
+## Quick start
+
+### Prerequisites
+
+- Node.js **24 or later**
+- pnpm **12.21.0**, enabled through Corepack
 
 ```bash
-pnpm run setup             # install, generate types, seed Alex and Sam
-# or: pnpm reset          # clear local data and begin at /welcome
-pnpm ingest --force    # optional: fetch the first live discoveries
+git clone https://github.com/hassan200503/Lovora.git
+cd Lovora
+corepack enable pnpm
+pnpm run setup
 pnpm dev
 ```
 
-No database setup is needed: without `DATABASE_URL`, an embedded Postgres (PGlite) lives in `apps/web/.data/`. It allows one process at a time, so stop `pnpm dev` before running `seed`, `ingest` or `retag`. The generated demo emails and passwords are in `apps/web/.env.local` (git-ignored); `pnpm passwords` rotates every password and writes a handover file (`PASSWORDS.local.md`).
+Open [http://localhost:3000](http://localhost:3000). `pnpm run setup` installs the locked workspace dependencies, generates route types, and seeds fictional demo accounts. Generated demo credentials are written to `apps/web/.env.local`, which is ignored by Git.
+
+To start without demo data, reset the local world and complete onboarding at `/welcome`:
 
 ```bash
-pnpm test          # unit + integration over a real migrated PGlite schema, including the
-                   # 21-table cross-couple tenancy matrix and the sync simulator
-pnpm typecheck
-pnpm lint
-pnpm build
-pnpm a11y          # axe-core WCAG 2.2 AA, light and dark
+pnpm reset
+pnpm dev
 ```
 
-Turborepo runs each gate across `apps/web` and `packages/*`. Integration tests boot an embedded Postgres and apply the same Drizzle migrations production gets, so tenant isolation is tested against the real schema rather than mocks.
+Local development needs no database service. With `DATABASE_URL` unset, data lives in `apps/web/.data/`; only one process may use it at a time.
 
-## How it's built
+## Configuration
 
-- **Monorepo:** pnpm workspaces + Turborepo. `apps/web` is Next.js (App Router, React Server Components, server actions) on React 19; `packages/domain`, `packages/sync-protocol` and `packages/ui-tokens` are shared, typed and independently tested.
-- **Data:** Drizzle ORM over Postgres (embedded PGlite locally and in tests, node-postgres/Neon in production). Every couple-owned table carries `couple_id`, and the context is resolved from the verified session — never from a URL or request parameter.
-- **Privacy by construction:** one `visibleTo()` rule decides private / shared / public, a 21-table generated matrix proves another couple's rows can't be read or written, and the public profile is served by a single reader with a column allowlist at an opaque handle.
-- **Realtime:** polling with server-assigned versions for chat and room state, WebRTC for calls, Web Push for rings and messages. No shared socket required, so it works on any host that runs Node.
-- **AI:** Gemini research with citations and grounded search, keys sealed at rest; a repository review agent (`pnpm review:agent`) reads the branch diff and latest gate log, reports severity-ranked findings with file and line references, and runs a secret scan even offline; a gate-triage agent (`pnpm triage:agent`) turns a failed typecheck/lint/test/build/a11y log into a ranked repair plan with a proof command per step, writing reports under `.loop/` only and never editing the tree. Next, an in-app guide agent.
-- **Plans:** limits belong to the couple and are enforced on the server; Settings shows live usage. A comparison screen at `/premium` sits behind the `paywall` flag, reads the same entitlement row, shows no invented price and has purchases disabled (ADR-003).
-- **Accounts:** first-party email and password sign-up. Emails are unique (case-insensitive), passwords are bcrypt (cost 12), login errors never reveal whether an account exists, and per-IP/per-account attempt buckets live in Postgres. Sessions are 30-day httpOnly JWTs carrying a `sessionVersion`; changing a password, recovering an account or signing out everywhere invalidates every older token. Partner invitations are single-use, stored as SHA-256 hashes, expire in 7 days and are consumed inside a transaction that locks the couple row. A one-time recovery code is shown at sign-up and can be regenerated from Settings.
-- **Status:** the web app is production-grade and shippable as a PWA. A native Expo shell is planned and gated on store accounts and device testing, not on a rewrite — the domain and sync logic are already framework-free.
+Copy the values you need from [`apps/web/.env.example`](apps/web/.env.example). Never commit `.env.local`.
 
-## Deploy for free (no card)
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | Production | PostgreSQL connection string. Leave unset for local PGlite. |
+| `SESSION_SECRET` | Production if no `DATABASE_URL` | 32+ random characters used to sign sessions. |
+| `CRON_SECRET` | Optional | Protects the HTTP trend-ingest trigger. |
+| `GEMINI_API_KEY` | Optional | Enables Gemini-assisted research. It can also be set in the app's AI Research settings. |
+| `GEMINI_MODELS` | Optional | Comma-separated model fallback order for research. |
+| `YOUTUBE_API_KEY` | Optional | Enables live YouTube discovery in the shared gallery. |
+| `VAPID_SUBJECT` | Optional | Contact value for web-push VAPID and OpenAlex polite-pool requests. |
+| TURN variables | Optional | Configure Cloudflare, Metered, or a custom TURN relay for restrictive networks. |
 
-See [`DEPLOY.md`](DEPLOY.md).
+The supported TURN settings are `CLOUDFLARE_TURN_KEY_ID` / `CLOUDFLARE_TURN_API_TOKEN`, `METERED_TURN_DOMAIN` / `METERED_TURN_API_KEY`, or `TURN_URLS` / `TURN_USERNAME` / `TURN_CREDENTIAL`. See [DEPLOY.md](DEPLOY.md) for provider-specific instructions.
+
+## Scripts and verification
+
+Run these commands from the repository root.
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm dev` | Run the web app in development mode. |
+| `pnpm build` | Create production builds across the workspace. |
+| `pnpm typecheck` | Generate route types and run TypeScript checks. |
+| `pnpm lint` | Run ESLint. |
+| `pnpm test` | Run unit and integration tests, including the real migrated PGlite schema. |
+| `pnpm a11y` | Run the local axe-core WCAG 2.2 AA audit. |
+| `pnpm motion` | Audit reduced-motion, flashing, and forced-colors behavior. |
+| `pnpm audit:deps` | Run the repository dependency policy audit. |
+| `pnpm check` | Run typecheck, lint, tests, and a production build. |
+| `pnpm ingest --force` | Fetch an initial batch of live discovery content. |
+| `pnpm retag` | Re-apply topic rules to stored discoveries. |
+
+GitHub Actions runs a frozen-lockfile install, route type generation, typechecking, linting, tests, production build, and dependency audit on pushes to `main` and pull requests. See [CI workflow](.github/workflows/ci.yml).
+
+## Deploying
+
+The verified deployment is **https://lovora-app.vercel.app/**.
+
+The repository includes a no-card deployment path using:
+
+1. **Neon** for production PostgreSQL.
+2. **Vercel** for the Next.js application, with `apps/web` as the project root.
+3. **GitHub Actions** for scheduled discovery ingestion.
+
+Set `DATABASE_URL` in the host environment before the first production deployment. The `vercel-build` script applies migrations before building. For calls on restrictive mobile networks, configure a TURN relay. The complete provider setup, scheduled ingest, web-push behavior, and operational constraints are documented in [DEPLOY.md](DEPLOY.md).
+
+## Privacy and security
+
+- Couple-owned records are scoped by `couple_id`; request input never decides the tenant.
+- Personal content has a defined visibility: **private**, **shared**, or explicitly opted-in **public**.
+- Passwords use bcrypt; sessions are signed, httpOnly, 30-day JWTs carrying a session version so password changes and sign-out-everywhere invalidate old sessions.
+- Partner invitations are single-use, hashed, expire after seven days, and are consumed transactionally.
+- Secrets such as AI keys and configured relays are stored sealed at rest when saved in the app.
+- Security headers are provided through Next.js and runtime secrets stay out of the repository.
+
+Read the detailed [security notes](docs/SECURITY.md), [privacy design](docs/PRIVACY.md), and [architecture](docs/ARCHITECTURE.md) before operating a public deployment.
+
+## Documentation
+
+- [Product definition](docs/PRODUCT.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Design system](docs/DESIGN.md)
+- [Deployment guide](DEPLOY.md)
+- [Runbook](docs/RUNBOOK.md)
+- [Verification notes](docs/VERIFICATION.md)
+- [Feature parity](docs/PARITY.md)
+
+## Contributing
+
+Before opening a pull request, run the checks relevant to your change. New couple-owned data must retain session-derived tenancy, migrations, and cross-couple coverage. New visible personal data must pass through the shared visibility rule. Follow the pull-request evidence template in [`.github/pull_request_template.md`](.github/pull_request_template.md).
+
+## License
+
+No license file is currently included in this repository. Do not assume permission to reuse or redistribute the code until the project owner publishes a license.
